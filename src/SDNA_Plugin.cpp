@@ -50,14 +50,7 @@ SoundDNA::SoundDNA(const InstanceInfo& info)
 #endif
 
   mEditorInitFunc = [&]() {
-#if defined _DEBUG && !defined OS_IOS
-    namespace fs = std::filesystem;
-    fs::path srcPath(__FILE__);
-    fs::path htmlPath = srcPath.parent_path().parent_path() / "resources" / "web" / "index.html";
-    LoadFile(htmlPath.string().c_str(), nullptr);
-#else
-    LoadIndexHtml(__FILE__, GetBundleID());
-#endif
+    LoadHTML(kSoundDNAUIHTML);
     EnableScroll(false);
     SendParametersToUI();
   };

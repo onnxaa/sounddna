@@ -1,5 +1,9 @@
 #pragma once
 #include "IPlug_include_in_plug_hdr.h"
+
+BEGIN_IPLUG_NAMESPACE
+extern const char* kSoundDNAUIHTML;
+END_IPLUG_NAMESPACE
 #include "DSP/SDNA_Types.h"
 #include "SDNA_Params.h"
 #include "DSP/SDNA_TransferEngine.h"

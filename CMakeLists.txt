@@ -230,7 +230,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(FFTW3 REQUIRED fftw3f)
+pkg_check_modules(FFTW3 REQUIRED fftw3)
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 
 set(SOURCES
@@ -270,6 +270,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   list(APPEND PLATFORM_SOURCES src/linux/IPlugPaths_linux.cpp)
 endif()
 
+# ── Generate embedded UI resource from web files ──────────────────────────
+find_package(Python3 REQUIRED)
+set(UI_RESOURCE_SRC "${CMAKE_BINARY_DIR}/generated/UIResource.cpp")
+add_custom_command(
+  OUTPUT ${UI_RESOURCE_SRC}
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/generated"
+  COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/generate_ui_resource.py"
+          "${CMAKE_SOURCE_DIR}/resources/web" "${UI_RESOURCE_SRC}"
+  DEPENDS
+    ${WEB_RESOURCES}
+    "${CMAKE_SOURCE_DIR}/scripts/generate_ui_resource.py"
+  COMMENT "Generating embedded UI resource from web files"
+)
+list(APPEND SOURCES ${UI_RESOURCE_SRC})
+
 iplug_add_plugin(${PROJECT_NAME}
   SOURCES ${SOURCES} ${PLATFORM_SOURCES}
   WEB_RESOURCES ${WEB_RESOURCES}
@@ -279,16 +294,20 @@ iplug_add_plugin(${PROJECT_NAME}
   DEFINES USE_FFTW3
 )
 
+# Ensure UI resource is generated before compiling
+set_source_files_properties(${UI_RESOURCE_SRC} PROPERTIES GENERATED TRUE)
+
 target_include_directories(_${PROJECT_NAME}-base INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${FFTW3_INCLUDE_DIRS}
   ${SNDFILE_INCLUDE_DIRS}
 )
 
-# ── Linux post-build: VST3 bundle ──────────────────────────────────────────
+# ── Linux post-build: VST3 bundle + deploy ─────────────────────────────────
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET ${PROJECT_NAME}-vst3)
   set(VST3_BUNDLE_DIR "${CMAKE_BINARY_DIR}/out/${PROJECT_NAME}.vst3")
   set(VST3_ARCH_DIR "${VST3_BUNDLE_DIR}/Contents/x86_64-linux")
+  set(VST3_DEPLOY_DIR "$ENV{HOME}/.vst3/${PROJECT_NAME}.vst3")
   add_custom_command(TARGET ${PROJECT_NAME}-vst3 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${VST3_ARCH_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy
@@ -297,7 +316,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET ${PROJECT_NAME}-vst3)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/resources/web"
       "${VST3_BUNDLE_DIR}/Contents/Resources/web"
-    COMMENT "Creating VST3 bundle at ${VST3_BUNDLE_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${VST3_DEPLOY_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${VST3_BUNDLE_DIR}" "${VST3_DEPLOY_DIR}"
+    COMMENT "Creating VST3 bundle at ${VST3_BUNDLE_DIR}, deploying to ${VST3_DEPLOY_DIR}"
   )
 endif()
 

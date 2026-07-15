@@ -64,17 +64,13 @@ using namespace iplug;
 
 namespace {
 
-struct ScopedGtkInit {
-  ScopedGtkInit() {
-    static bool done = false;
-    if (!done) {
-      gtk_init_check(nullptr, nullptr);
-      done = true;
-    }
+void EnsureGtkInit() {
+  static bool done = false;
+  if (!done) {
+    gtk_init_check(nullptr, nullptr);
+    done = true;
   }
-};
-
-ScopedGtkInit sGtkInit;
+}
 
 GdkWindow* GetGdkWindowFromX11(Window xid) {
   GdkDisplay* display = gdk_display_get_default();
@@ -98,6 +94,7 @@ IWebViewImpl::~IWebViewImpl()
 
 void* IWebViewImpl::OpenWebView(void* pParent, float x, float y, float w, float h, float scale)
 {
+  EnsureGtkInit();
   mParentWindow = reinterpret_cast<Window>(pParent);
   if (!mParentWindow) return nullptr;
 
