@@ -3,6 +3,12 @@
 // These are called by the native C++ side
 // ============================================================
 
+// If IPlugSendMsg is not injected by native side (e.g. helper process),
+// define a no-op fallback so app.js init() doesn't throw
+if (typeof IPlugSendMsg === 'undefined') {
+  window.IPlugSendMsg = function() {};
+}
+
 function SPVFD(paramIdx, val) {
   if (window.app) app.onParamChange(paramIdx, val);
 }
