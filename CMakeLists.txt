@@ -271,19 +271,40 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # ── Generate embedded UI resource from web files ──────────────────────────
-find_package(Python3 REQUIRED)
+set(WEB_DIR "${CMAKE_SOURCE_DIR}/resources/web")
 set(UI_RESOURCE_SRC "${CMAKE_BINARY_DIR}/generated/UIResource.cpp")
-add_custom_command(
-  OUTPUT ${UI_RESOURCE_SRC}
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/generated"
-  COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/generate_ui_resource.py"
-          "${CMAKE_SOURCE_DIR}/resources/web" "${UI_RESOURCE_SRC}"
-  DEPENDS
-    ${WEB_RESOURCES}
-    "${CMAKE_SOURCE_DIR}/scripts/generate_ui_resource.py"
-  COMMENT "Generating embedded UI resource from web files"
-)
+
+# Read and inline all web resources into a C++ source file
+file(READ "${WEB_DIR}/index.html" HTML_CONTENT)
+
+file(READ "${WEB_DIR}/css/style.css" CSS_CONTENT)
+string(REPLACE "<link rel=\"stylesheet\" href=\"css/style.css\">"
+  "<style>\n${CSS_CONTENT}\n</style>" HTML_CONTENT "${HTML_CONTENT}")
+
+foreach(JS_FILE js/utils.js js/dnaMap.js js/dnaAnalyzer.js js/dnaTransfer.js
+               js/dnaCompare.js js/dnaMorph.js js/dnaBrowser.js js/app.js)
+  file(READ "${WEB_DIR}/${JS_FILE}" JS_CONTENT)
+  string(REPLACE "<script src=\"${JS_FILE}\"></script>"
+    "<script>\n${JS_CONTENT}\n</script>" HTML_CONTENT "${HTML_CONTENT}")
+endforeach()
+
+file(WRITE "${UI_RESOURCE_SRC}"
+  "// Auto-generated UI resource file. Do not edit.\n"
+  "#include \"IPlugPlatform.h\"\n\n"
+  "BEGIN_IPLUG_NAMESPACE\n\n"
+  "const char* kSoundDNAUIHTML = R\"NRUI_END(\n"
+  "${HTML_CONTENT}\n"
+  ")NRUI_END\";\n\n"
+  "END_IPLUG_NAMESPACE\n")
+
 list(APPEND SOURCES ${UI_RESOURCE_SRC})
+
+# Re-run generation when any web file changes
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  ${WEB_DIR}/index.html ${WEB_DIR}/css/style.css ${WEB_DIR}/js/utils.js
+  ${WEB_DIR}/js/dnaMap.js ${WEB_DIR}/js/dnaAnalyzer.js ${WEB_DIR}/js/dnaTransfer.js
+  ${WEB_DIR}/js/dnaCompare.js ${WEB_DIR}/js/dnaMorph.js ${WEB_DIR}/js/dnaBrowser.js
+  ${WEB_DIR}/js/app.js)
 
 iplug_add_plugin(${PROJECT_NAME}
   SOURCES ${SOURCES} ${PLATFORM_SOURCES}
@@ -294,7 +315,6 @@ iplug_add_plugin(${PROJECT_NAME}
   DEFINES USE_FFTW3
 )
 
-# Ensure UI resource is generated before compiling
 set_source_files_properties(${UI_RESOURCE_SRC} PROPERTIES GENERATED TRUE)
 
 target_include_directories(_${PROJECT_NAME}-base INTERFACE
