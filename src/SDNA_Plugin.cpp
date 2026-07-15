@@ -6,7 +6,7 @@
 #include <algorithm>
 
 SoundDNA::SoundDNA(const InstanceInfo& info)
-  : Plugin(info, MakeConfig(kNumParams, 0))
+  : PLUGIN_API_BASE(info, MakeConfig(kNumParams, 0))
 {
   GetParam(kInputGain)->InitGain("InputGain", 0., -18., 18.);
   GetParam(kOutputGain)->InitGain("OutputGain", 0., -18., 18.);

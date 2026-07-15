@@ -1,7 +1,7 @@
 #pragma once
 #include "IPlug_include_in_plug_hdr.h"
-#include "SDNA_Params.h"
 #include "DSP/SDNA_Types.h"
+#include "SDNA_Params.h"
 #include "DSP/SDNA_TransferEngine.h"
 #include "DSP/SDNA_MorphEngine.h"
 #include "DSP/SDNA_Analyzer.h"
