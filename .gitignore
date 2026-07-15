@@ -1,0 +1,7 @@
+iPlug2/
+build/
+*.o
+tmp/
+out/
+__pycache__/
+*.pyc

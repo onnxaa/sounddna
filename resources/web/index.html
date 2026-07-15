@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SoundDNA</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="toolbar">
+      <div class="toolbar-brand">
+        <div class="logo"></div>
+        SoundDNA
+      </div>
+      <div class="toolbar-actions">
+        <button class="toolbar-btn" onclick="window.app.undo()">Undo</button>
+        <button class="toolbar-btn" onclick="window.app.redo()">Redo</button>
+        <button class="toolbar-btn" onclick="window.app.compare()">Compare</button>
+        <button class="toolbar-btn" onclick="window.app.toggleBrowser()">Browser</button>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <!-- Panel: Input -->
+      <div class="panel panel-input">
+        <div class="panel-header">
+          <span>INPUT</span>
+          <span class="badge">Target Audio</span>
+        </div>
+        <div class="panel-body">
+          <div class="dropzone" id="targetDropzone" ondragover="event.preventDefault()" ondrop="app.handleDrop(event, 'target')">
+            <div class="dropzone-icon">&#9835;</div>
+            <div class="dropzone-text">Drop WAV/AIFF/FLAC or use DAW input</div>
+          </div>
+          <div class="analyzer-report" id="targetReport">
+            <div class="analyzer-row"><span class="analyzer-label">Detected Instrument</span><span class="analyzer-value" id="targetInstrument">—</span></div>
+            <div class="analyzer-row"><span class="analyzer-label">Confidence</span><span class="analyzer-value" id="targetConfidence">—</span></div>
+            <div class="analyzer-row"><span class="analyzer-label">Pitch</span><span class="analyzer-value" id="targetPitch">—</span></div>
+            <div class="analyzer-row"><span class="analyzer-label">Dynamic Range</span><span class="analyzer-value" id="targetDR">—</span></div>
+            <div class="analyzer-row"><span class="analyzer-label">Brightness</span><span class="analyzer-value" id="targetBrightness">—</span></div>
+            <div class="analyzer-row"><span class="analyzer-label">Noise</span><span class="analyzer-value" id="targetNoise">—</span></div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-primary btn-small" onclick="SAMFUI(0)">Analyze Target</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: DNA Source -->
+      <div class="panel panel-dnasource">
+        <div class="panel-header">
+          <span>DNA SOURCE</span>
+          <span class="badge">Current DNA</span>
+        </div>
+        <div class="panel-body">
+          <div class="dna-badge" id="sourceBadge">No DNA loaded</div>
+          <div class="dropzone" id="sourceDropzone" style="min-height:40px" ondragover="event.preventDefault()" ondrop="app.handleDrop(event, 'source')">
+            <div class="dropzone-text">Drop DNA file or select from library</div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-small" onclick="SAMFUI(1)">From Library</button>
+            <button class="btn btn-small" onclick="SAMFUI(2)">From File</button>
+            <button class="btn btn-small" onclick="SAMFUI(3)">Analyze Current</button>
+          </div>
+          <div class="dna-layers" id="dnaLayers">
+            <div class="dna-layer"><div class="dna-layer-color" style="background:var(--accent)"></div><span class="dna-layer-name">Default</span><span class="dna-layer-pct">100%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: DNA Map -->
+      <div class="panel panel-dnamap">
+        <div class="panel-header">
+          <span>DNA MAP</span>
+          <span class="badge">interactive</span>
+        </div>
+        <div class="panel-body" style="padding:6px">
+          <canvas id="dnaMapCanvas" class="dna-map-canvas"></canvas>
+          <div style="display:flex;gap:4px;margin-top:4px">
+            <input type="range" class="slider-control" id="morphSlider" min="0" max="100" value="0" oninput="app.onMorphChange(this.value)">
+            <span class="slider-value" id="morphValue">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Transfer -->
+      <div class="panel panel-transfer">
+        <div class="panel-header">
+          <span>TRANSFER</span>
+          <span class="badge">DNA Genes</span>
+        </div>
+        <div class="panel-body" id="transferControls">
+        </div>
+      </div>
+
+      <!-- Panel: Output -->
+      <div class="panel panel-output">
+        <div class="panel-header">
+          <span>OUTPUT</span>
+          <span class="badge">A/B</span>
+        </div>
+        <div class="panel-body">
+          <div class="output-controls">
+            <div class="output-row">
+              <div class="ab-toggle">
+                <button class="ab-btn active" onclick="app.setAB('a')">A</button>
+                <button class="ab-btn" onclick="app.setAB('b')">B</button>
+              </div>
+              <span style="font-size:10px;color:var(--text-muted)">A: Dry / B: Wet</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-label">Mix</span>
+              <input type="range" class="slider-control" id="mixSlider" min="0" max="100" value="50" oninput="app.onMixChange(this.value)">
+              <span class="slider-value" id="mixValue">50%</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-label">Gain</span>
+              <input type="range" class="slider-control" id="gainSlider" min="0" max="100" value="50" oninput="app.onGainChange(this.value)">
+              <span class="slider-value" id="gainValue">0 dB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="compare-overlay" id="compareOverlay">
+    <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+      <span style="font-weight:600">DNA Compare</span>
+      <button class="btn btn-small" onclick="app.closeCompare()">Close</button>
+    </div>
+    <div style="display:flex;flex:1;gap:16px">
+      <div style="flex:1;background:var(--bg-primary);border-radius:8px;padding:12px">
+        <canvas id="compareRadar" class="radar-chart"></canvas>
+      </div>
+      <div style="flex:1" id="compareDiffList">
+      </div>
+    </div>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/dnaMap.js"></script>
+  <script src="js/dnaAnalyzer.js"></script>
+  <script src="js/dnaTransfer.js"></script>
+  <script src="js/dnaCompare.js"></script>
+  <script src="js/dnaMorph.js"></script>
+  <script src="js/dnaBrowser.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+  function OnParamChange(param, value) {
+    if (window.app) app.onParamChange(param, value);
+  }
+  function OnControlChange(ctrlTag, value) {
+    if (window.app) app.onControlChange(ctrlTag, value);
+  }
+  function OnMessage(msgTag, dataSize, data) {
+    if (window.app) app.onMessage(msgTag, dataSize, data);
+  }
+  </script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+// ============================================================
+// iPlug2 WebView Bridge Functions
+// These are called by the native C++ side
+// ============================================================
+
+function SPVFD(paramIdx, val) {
+  if (window.app) app.onParamChange(paramIdx, val);
+}
+
+function SCVFD(ctrlTag, val) {
+  if (window.app) app.onControlChange(ctrlTag, val);
+}
+
+function SCMFD(ctrlTag, msgTag, msg) {
+}
+
+function SAMFD(msgTag, dataSize, msg) {
+  if (window.app) app.onMessage(msgTag, dataSize, msg || '');
+}
+
+function SMMFD(statusByte, dataByte1, dataByte2) {
+}
+
+function SSMFD(offset, size, msg) {
+}
+
+// ============================================================
+// Functions called by JS to send data to the native C++ side
+// ============================================================
+
+function SAMFUI(msgTag, ctrlTag, data) {
+  var message = {
+    "msg": "SAMFUI",
+    "msgTag": msgTag,
+    "ctrlTag": ctrlTag !== undefined ? ctrlTag : -1,
+    "data": data || ""
+  };
+  IPlugSendMsg(message);
+}
+
+function SMMFUI(statusByte, dataByte1, dataByte2) {
+  var message = {
+    "msg": "SMMFUI",
+    "statusByte": statusByte,
+    "dataByte1": dataByte1,
+    "dataByte2": dataByte2
+  };
+  IPlugSendMsg(message);
+}
+
+function SSMFUI(data) {
+  var message = {
+    "msg": "SSMFUI",
+    "data": data || ""
+  };
+  IPlugSendMsg(message);
+}
+
+function SPVFUI(paramIdx, value) {
+  var message = {
+    "msg": "SPVFUI",
+    "paramIdx": parseInt(paramIdx),
+    "value": value
+  };
+  IPlugSendMsg(message);
+}
+
+function EPCFUI(paramIdx) {
+  if (paramIdx < 0) return;
+  var message = {
+    "msg": "EPCFUI",
+    "paramIdx": parseInt(paramIdx)
+  };
+  IPlugSendMsg(message);
+}
+
+function BPCFUI(paramIdx) {
+  if (paramIdx < 0) return;
+  var message = {
+    "msg": "BPCFUI",
+    "paramIdx": parseInt(paramIdx)
+  };
+  IPlugSendMsg(message);
+}
+
+// ============================================================
+// SoundDNA Application Bridge & Utilities
+// ============================================================
+
+window.SDNA = window.SDNA || {};
+
+SDNA.utils = {
+  clamp: (v, min, max) => Math.min(Math.max(v, min), max),
+
+  dbToAmp: (db) => Math.pow(10, db / 20),
+
+  ampToDb: (amp) => amp > 0 ? 20 * Math.log10(amp) : -144,
+
+  lerp: (a, b, t) => a + (b - a) * t,
+
+  formatPct: (v) => Math.round(v) + '%',
+
+  formatDb: (v) => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB',
+
+  parseJSON: (str) => {
+    try { return JSON.parse(str); } catch(e) { return null; }
+  },
+
+  debounce: (fn, delay) => {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  },
+
+  geneColors: [
+    '#6c5ce7', '#00cec9', '#fdcb6e', '#ff7675',
+    '#74b9ff', '#a29bfe', '#55efc4', '#ff9ff3',
+    '#feca57', '#ff6348', '#7bed9f', '#70a1ff',
+    '#5352ed'
+  ],
+
+  geneNames: [
+    'Tone', 'Dynamics', 'Noise', 'Space',
+    'Movement', 'Stereo', 'Texture', 'Punch',
+    'Body', 'Resonance', 'Warmth', 'Sparkle', 'Glue'
+  ]
+};
+
+SDNA.Bridge = {
+  sendMessage: (msgTag, data) => {
+    if (typeof SAMFUI !== 'undefined') {
+      SAMFUI(msgTag, -1, data || '');
+    }
+  },
+
+  sendParam: (paramIdx, value) => {
+    if (typeof SPVFUI !== 'undefined') {
+      SPVFUI(paramIdx, value);
+    }
+  },
+
+  requestParameters: () => {
+    SDNA.Bridge.sendMessage(12, '');
+  },
+
+  analyzeSource: () => {
+    SDNA.Bridge.sendMessage(0, '');
+  },
+
+  analyzeTarget: () => {
+    SDNA.Bridge.sendMessage(1, '');
+  },
+
+  loadDNA: (json) => {
+    SDNA.Bridge.sendMessage(2, btoa(JSON.stringify(json)));
+  },
+
+  saveDNA: (json) => {
+    SDNA.Bridge.sendMessage(3, btoa(JSON.stringify(json)));
+  },
+
+  morphAdd: (profile) => {
+    SDNA.Bridge.sendMessage(6, btoa(JSON.stringify(profile)));
+  },
+
+  morphClear: () => {
+    SDNA.Bridge.sendMessage(7, '');
+  },
+
+  searchBrowser: (query) => {
+    SDNA.Bridge.sendMessage(8, btoa(JSON.stringify(query)));
+  },
+
+  compareProfiles: (profileA, profileB) => {
+    SDNA.Bridge.sendMessage(10, btoa(JSON.stringify({ a: profileA, b: profileB })));
+  }
+};
