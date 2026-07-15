@@ -323,6 +323,22 @@ target_include_directories(_${PROJECT_NAME}-base INTERFACE
   ${SNDFILE_INCLUDE_DIRS}
 )
 
+# ── WebView helper binary ────────────────────────────────────────────
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_package(X11 REQUIRED)
+  add_executable(WebViewHelper
+    src/linux/WebViewHelper.cpp
+  )
+  target_link_libraries(WebViewHelper PRIVATE
+    PkgConfig::WEBKIT2GTK
+    PkgConfig::GTK3
+    X11::X11
+  )
+  set_target_properties(WebViewHelper PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/out"
+  )
+endif()
+
 # ── Linux post-build: VST3 bundle + deploy ─────────────────────────────────
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET ${PROJECT_NAME}-vst3)
   set(VST3_BUNDLE_DIR "${CMAKE_BINARY_DIR}/out/${PROJECT_NAME}.vst3")
@@ -333,6 +349,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET ${PROJECT_NAME}-vst3)
     COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:${PROJECT_NAME}-vst3>"
       "${VST3_ARCH_DIR}/${PROJECT_NAME}.so"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "$<TARGET_FILE:WebViewHelper>"
+      "${VST3_ARCH_DIR}/WebViewHelper"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/resources/web"
       "${VST3_BUNDLE_DIR}/Contents/Resources/web"
@@ -350,6 +369,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET ${PROJECT_NAME}-clap)
     COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:${PROJECT_NAME}-clap>"
       "${CLAP_DEPLOY_DIR}/${PROJECT_NAME}.clap"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "$<TARGET_FILE:WebViewHelper>"
+      "${CLAP_DEPLOY_DIR}/WebViewHelper"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_SOURCE_DIR}/resources/web"
+      "${CLAP_DEPLOY_DIR}/resources/web"
     COMMENT "Deploying CLAP to ${CLAP_DEPLOY_DIR}"
   )
 endif()
