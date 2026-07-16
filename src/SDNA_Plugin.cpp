@@ -49,6 +49,25 @@ SoundDNA::SoundDNA(const InstanceInfo& info)
   SetEnableDevTools(true);
 #endif
 
+  // Handle audio file drops from helper process
+  SetAudioDropHandler([this](const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) { DBGMSG("AUDIO_DROP: cannot open %s\n", path); return; }
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    if (sz < 44) { fclose(f); return; } // too small
+    rewind(f);
+    auto* buf = (unsigned char*)malloc(sz);
+    if (!buf) { fclose(f); return; }
+    size_t got = fread(buf, 1, sz, f);
+    fclose(f);
+    if (got < 44) { free(buf); return; }
+    // Pass raw WAV data to OnMessage for analysis
+    OnMessage(kMsgTagAnalyzeTarget, -1, (int)got, buf);
+    free(buf);
+    unlink(path);
+  });
+
   mEditorInitFunc = [&]() {
     LoadHTML(kSoundDNAUIHTML);
     EnableScroll(false);

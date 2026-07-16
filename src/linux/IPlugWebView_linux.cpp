@@ -442,6 +442,10 @@ private:
   // Pending JS completion handlers, indexed by id
   std::mutex mJsMtx;
   std::map<int, IWebView::completionHandlerFunc> mJsCallbacks;
+
+public:
+  // Callback for audio file drops from the helper (called on paren/UI thread)
+  std::function<void(const char* audioFilePath)> mAudioDropHandler = nullptr;
 };
 
 END_IPLUG_NAMESPACE
@@ -563,6 +567,10 @@ void IWebViewImpl::DrainEvents()
     else if (strcmp(line, "PAGE_LOADED") == 0) {
       if (mIWebView)
         mIWebView->OnWebContentLoaded();
+    }
+    else if (strncmp(line, "AUDIO_DROP ", 11) == 0) {
+      if (mAudioDropHandler)
+        mAudioDropHandler(line + 11);
     }
   }
 }
@@ -882,6 +890,10 @@ void IWebViewImpl::GetLocalDownloadPathForFile(const char* fileName, WDL_String&
 {
   DesktopPath(downloadPath);
   downloadPath.AppendFormatted(MAX_WIN32_PATH_LEN, "/%s", fileName);
+}
+
+void IWebView::SetAudioDropHandler(std::function<void(const char* audioFilePath)> handler) {
+  if (mpImpl) mpImpl->mAudioDropHandler = std::move(handler);
 }
 
 #include "IPlugWebView.cpp"

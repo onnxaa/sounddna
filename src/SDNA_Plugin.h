@@ -61,4 +61,5 @@ private:
   void SendAnalyzerReportToUI(const DNAProfile& profile);
   void SendDNAProfileToUI(const DNAProfile& profile, const char* type);
   void SendParametersToUI();
+  void AnalyzeWAVFromFile(const char* path);
 };
