@@ -1,4 +1,4 @@
-class SoundDNAApp {
+class GenoApp {
   constructor() {
     this.params = {};
     this.currentAB = 'a';
@@ -10,7 +10,7 @@ class SoundDNAApp {
   }
 
   init() {
-    SDNA.Bridge.requestParameters();
+    GENO.Bridge.requestParameters();
 
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'z') this.undo();
@@ -18,23 +18,23 @@ class SoundDNAApp {
     });
 
     setInterval(() => {
-      if (SDNA.dnaMap) SDNA.dnaMap.render();
+      if (GENO.dnaMap) GENO.dnaMap.render();
     }, 100);
 
-    setTimeout(() => SDNA.Bridge.requestParameters(), 500);
+    setTimeout(() => GENO.Bridge.requestParameters(), 500);
   }
 
   onParamChange(paramIdx, value) {
     this.params[paramIdx] = value;
 
     if (paramIdx >= 3 && paramIdx < 17) {
-      const geneIdx = SDNA.utils.paramToGene[paramIdx - 3];
-      if (SDNA.transfer) SDNA.transfer.setGeneAmount(geneIdx, value);
+      const geneIdx = GENO.utils.paramToGene[paramIdx - 3];
+      if (GENO.transfer) GENO.transfer.setGeneAmount(geneIdx, value);
     }
 
     if (paramIdx >= 17 && paramIdx < 31) {
-      const geneIdx = SDNA.utils.paramToGene[paramIdx - 17];
-      if (SDNA.transfer) SDNA.transfer.setGeneLock(geneIdx, value > 0.5);
+      const geneIdx = GENO.utils.paramToGene[paramIdx - 17];
+      if (GENO.transfer) GENO.transfer.setGeneLock(geneIdx, value > 0.5);
     }
 
     if (paramIdx === 31) {
@@ -43,7 +43,7 @@ class SoundDNAApp {
       const valEl = document.getElementById('morphValue');
       if (slider) slider.value = pct;
       if (valEl) valEl.textContent = pct + '%';
-      if (SDNA.dnaMap) SDNA.dnaMap.setMorphPosition(pct);
+      if (GENO.dnaMap) GENO.dnaMap.setMorphPosition(pct);
     }
   }
 
@@ -63,11 +63,11 @@ class SoundDNAApp {
 
     switch (msgTag) {
       case 14: {
-        if (SDNA.analyzer) SDNA.analyzer.updateReport(json);
+        if (GENO.analyzer) GENO.analyzer.updateReport(json);
         break;
       }
       case 15: {
-        if (SDNA.analyzer) SDNA.analyzer.updateReport(json);
+        if (GENO.analyzer) GENO.analyzer.updateReport(json);
         break;
       }
       case 13: {
@@ -94,7 +94,7 @@ class SoundDNAApp {
   }
 
   toggleCapture() {
-    SDNA.Bridge.sendMessage(18, '');
+    GENO.Bridge.sendMessage(18, '');
   }
 
   handleDrop(event, type) {
@@ -112,7 +112,7 @@ class SoundDNAApp {
 
   loadFile(path, type) {
     const tag = type === 'source' ? 17 : 16;
-    SDNA.Bridge.sendMessage(tag, path);
+    GENO.Bridge.sendMessage(tag, path);
 
     if (type === 'target') {
       const dropzone = document.getElementById('targetDropzone');
@@ -135,19 +135,19 @@ class SoundDNAApp {
 
   onMixChange(value) {
     document.getElementById('mixValue').textContent = value + '%';
-    SDNA.Bridge.sendParam(2, value / 100);
+    GENO.Bridge.sendParam(2, value / 100);
   }
 
   onGainChange(value) {
     const db = ((value - 50) / 50) * 18;
     document.getElementById('gainValue').textContent = (db > 0 ? '+' : '') + db.toFixed(1) + ' dB';
-    SDNA.Bridge.sendParam(1, value / 100);
+    GENO.Bridge.sendParam(1, value / 100);
   }
 
   onMorphChange(value) {
     document.getElementById('morphValue').textContent = value + '%';
-    SDNA.Bridge.sendParam(31, value / 100);
-    if (SDNA.dnaMap) SDNA.dnaMap.setMorphPosition(parseFloat(value));
+    GENO.Bridge.sendParam(31, value / 100);
+    if (GENO.dnaMap) GENO.dnaMap.setMorphPosition(parseFloat(value));
   }
 
   undo() {
@@ -191,23 +191,23 @@ class SoundDNAApp {
       centroid: 5000,
       distortion: 0.4
     };
-    if (SDNA.compare) SDNA.compare.show(a, b);
+    if (GENO.compare) GENO.compare.show(a, b);
   }
 
   closeCompare() {
-    if (SDNA.compare) SDNA.compare.close();
+    if (GENO.compare) GENO.compare.close();
   }
 
   toggleBrowser() {
-    if (SDNA.browser) SDNA.browser.toggle();
+    if (GENO.browser) GENO.browser.toggle();
   }
 
   analyzeSource() {
-    SDNA.Bridge.analyzeSource();
+    GENO.Bridge.analyzeSource();
   }
 
   analyzeTarget() {
-    SDNA.Bridge.analyzeTarget();
+    GENO.Bridge.analyzeTarget();
   }
 
   onAudioFileSelected(input) {
@@ -229,4 +229,4 @@ class SoundDNAApp {
   }
 }
 
-window.app = new SoundDNAApp();
+window.app = new GenoApp();

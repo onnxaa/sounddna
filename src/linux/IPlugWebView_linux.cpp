@@ -281,11 +281,11 @@ static void child_shutdown_webview()
 
 static void on_crash(int sig)
 {
-  fprintf(stderr, "\n[SDNA-child] CRASH: signal %d (%s)\n", sig, strsignal(sig));
+  fprintf(stderr, "\n[Geno-child] CRASH: signal %d (%s)\n", sig, strsignal(sig));
   void* frames[64];
   int n = backtrace(frames, 64);
   backtrace_symbols_fd(frames, n, STDERR_FILENO);
-  fprintf(stderr, "[SDNA-child] aborting\n");
+  fprintf(stderr, "[Geno-child] aborting\n");
   _exit(128 + sig);
 }
 
@@ -300,30 +300,30 @@ static void child_main(int w, int h, const char* title, bool devtools)
   signal(SIGFPE, on_crash);
   signal(SIGILL, on_crash);
 
-  fprintf(stderr, "[SDNA-child] started (pid=%d)\n", getpid());
+  fprintf(stderr, "[Geno-child] started (pid=%d)\n", getpid());
 
   prctl(PR_SET_PDEATHSIG, SIGTERM);
   signal(SIGPIPE, SIG_DFL);
   signal(SIGCHLD, SIG_DFL);
 
-  fprintf(stderr, "[SDNA-child] gtk_init_check...\n");
+  fprintf(stderr, "[Geno-child] gtk_init_check...\n");
   if (!gtk_init_check(nullptr, nullptr)) {
-    fprintf(stderr, "[SDNA-child] gtk_init_check FAILED\n");
+    fprintf(stderr, "[Geno-child] gtk_init_check FAILED\n");
     _exit(2);
   }
-  fprintf(stderr, "[SDNA-child] gtk_init_check OK\n");
+  fprintf(stderr, "[Geno-child] gtk_init_check OK\n");
 
   WebViewChildState s;
   g_state = &s;
 
-  fprintf(stderr, "[SDNA-child] content manager...\n");
+  fprintf(stderr, "[Geno-child] content manager...\n");
   s.mgr = webkit_user_content_manager_new();
-  fprintf(stderr, "[SDNA-child] content manager OK\n");
+  fprintf(stderr, "[Geno-child] content manager OK\n");
   webkit_user_content_manager_register_script_message_handler(s.mgr, "iPlug");
   g_signal_connect(s.mgr, "script-message-received::iPlug",
       G_CALLBACK(on_script_msg), nullptr);
 
-  fprintf(stderr, "[SDNA-child] creating webkit user script...\n");
+  fprintf(stderr, "[Geno-child] creating webkit user script...\n");
   WebKitUserScript* zoom = webkit_user_script_new(
       "document.documentElement.dataset.zoom = '0.9';",
       WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
@@ -332,7 +332,7 @@ static void child_main(int w, int h, const char* title, bool devtools)
   webkit_user_content_manager_add_script(s.mgr, zoom);
   webkit_user_script_unref(zoom);
 
-  fprintf(stderr, "[SDNA-child] creating webkit web view...\n");
+  fprintf(stderr, "[Geno-child] creating webkit web view...\n");
   s.webview = webkit_web_view_new_with_user_content_manager(s.mgr);
   WebKitSettings* settings = webkit_web_view_get_settings(WEBKIT_WEB_VIEW(s.webview));
   webkit_settings_set_javascript_can_open_windows_automatically(settings, true);
@@ -538,7 +538,7 @@ void IWebViewImpl::DrainEvents()
     if (!ReadEvent(line, sizeof(line), 0)) break;
 
     if (strcmp(line, "CLOSED") == 0) {
-      fprintf(stderr, "[SDNA] child CLOSED\n");
+      fprintf(stderr, "[Geno] child CLOSED\n");
       mClosed.store(true);
     }
     else if (strncmp(line, "JS_RESULT ", 10) == 0) {
@@ -568,13 +568,13 @@ void IWebViewImpl::DrainEvents()
 }
 
 // Marker function used to locate the plugin .so via dladdr
-extern "C" void SDNA_WebView_Marker() {}
+extern "C" void Geno_WebView_Marker() {}
 
 static std::string FindHelperPath()
 {
   // Try to find the helper next to the plugin .so via dladdr
   Dl_info info;
-  if (dladdr((void*)SDNA_WebView_Marker, &info) && info.dli_fname) {
+  if (dladdr((void*)Geno_WebView_Marker, &info) && info.dli_fname) {
     std::string path(info.dli_fname);
     auto pos = path.rfind('/');
     if (pos != std::string::npos) {
@@ -612,7 +612,7 @@ static std::string FindHelperPath()
 static std::string FindIndexPath()
 {
   Dl_info info;
-  if (!dladdr((void*)SDNA_WebView_Marker, &info) || !info.dli_fname)
+  if (!dladdr((void*)Geno_WebView_Marker, &info) || !info.dli_fname)
     return "";
   std::string path(info.dli_fname);
   auto pos = path.rfind('/');
@@ -649,17 +649,17 @@ static std::string FindIndexPath()
 
 void* IWebViewImpl::OpenWebView(void* pParent, float x, float y, float w, float h, float scale)
 {
-  fprintf(stderr, "[SDNA] OpenWebView ENTER\n");
+  fprintf(stderr, "[Geno] OpenWebView ENTER\n");
   mParentWindow = reinterpret_cast<Window>(pParent);
-  if (!mParentWindow) { fprintf(stderr, "[SDNA] OpenWebView: no parent\n"); return nullptr; }
+  if (!mParentWindow) { fprintf(stderr, "[Geno] OpenWebView: no parent\n"); return nullptr; }
 
-  if (!mClosed.load()) { fprintf(stderr, "[SDNA] OpenWebView: already open\n"); return nullptr; }
+  if (!mClosed.load()) { fprintf(stderr, "[Geno] OpenWebView: already open\n"); return nullptr; }
   std::string helperPath = FindHelperPath();
   if (helperPath.empty()) {
-    fprintf(stderr, "[SDNA] WebViewHelper binary not found\n");
+    fprintf(stderr, "[Geno] WebViewHelper binary not found\n");
     return nullptr;
   }
-  fprintf(stderr, "[SDNA] helper binary: %s\n", helperPath.c_str());
+  fprintf(stderr, "[Geno] helper binary: %s\n", helperPath.c_str());
 
   // Build argv for helper: parentXid w h devtools
   char xidStr[32], wStr[32], hStr[32], dtStr[8];
@@ -680,7 +680,7 @@ void* IWebViewImpl::OpenWebView(void* pParent, float x, float y, float w, float 
   if (!g_spawn_async_with_pipes(nullptr, (char**)argv, nullptr, flags,
         nullptr, nullptr, &mChildPid,
         &child_stdin_fd, &child_stdout_fd, nullptr, &err)) {
-    fprintf(stderr, "[SDNA] g_spawn failed: %s\n", err->message);
+    fprintf(stderr, "[Geno] g_spawn failed: %s\n", err->message);
     g_error_free(err);
     return nullptr;
   }
@@ -688,19 +688,19 @@ void* IWebViewImpl::OpenWebView(void* pParent, float x, float y, float w, float 
   mWriteFd = child_stdin_fd;
   mReadFd  = child_stdout_fd;
 
-  fprintf(stderr, "[SDNA] child pid=%d, waiting for READY...\n", mChildPid);
+  fprintf(stderr, "[Geno] child pid=%d, waiting for READY...\n", mChildPid);
 
   // Read the X11 window ID from child
   char line[8192];
   if (!ReadEvent(line, sizeof(line), 10000)) {
-    fprintf(stderr, "[SDNA] timeout waiting for child READY\n");
+    fprintf(stderr, "[Geno] timeout waiting for child READY\n");
     CloseWebView();
     return nullptr;
   }
 
   unsigned long xid = 0;
   if (sscanf(line, "READY %lu", &xid) != 1) {
-    fprintf(stderr, "[SDNA] unexpected child event: %s\n", line);
+    fprintf(stderr, "[Geno] unexpected child event: %s\n", line);
     CloseWebView();
     return nullptr;
   }
@@ -710,8 +710,8 @@ void* IWebViewImpl::OpenWebView(void* pParent, float x, float y, float w, float 
   mInitialized = true;
   mIWebView->OnWebViewReady();
 
-  fprintf(stderr, "[SDNA] OpenWebView EXIT (child xid=%lu)\n", xid);
-  fprintf(stderr, "[SDNA] helper OPEN=%s\n", mClosed.load() ? "NO" : "YES");
+  fprintf(stderr, "[Geno] OpenWebView EXIT (child xid=%lu)\n", xid);
+  fprintf(stderr, "[Geno] helper OPEN=%s\n", mClosed.load() ? "NO" : "YES");
   return reinterpret_cast<void*>(xid);
 }
 
@@ -722,7 +722,7 @@ void* IWebViewImpl::OpenWebView(void* pParent, float x, float y, float w, float 
 void IWebViewImpl::CloseWebView()
 {
   if (mClosed.exchange(true)) return;
-  fprintf(stderr, "[SDNA] CloseWebView ENTER\n");
+  fprintf(stderr, "[Geno] CloseWebView ENTER\n");
 
   Send("QUIT");
 
@@ -732,7 +732,7 @@ void IWebViewImpl::CloseWebView()
     int status;
     pid_t ret = waitpid(mChildPid, &status, WNOHANG);
     if (ret == mChildPid) {
-      fprintf(stderr, "[SDNA] child exited (status=%d)\n", WEXITSTATUS(status));
+      fprintf(stderr, "[Geno] child exited (status=%d)\n", WEXITSTATUS(status));
       break;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -740,11 +740,11 @@ void IWebViewImpl::CloseWebView()
 
   // If still alive, force kill
   if (waitpid(mChildPid, nullptr, WNOHANG) == 0) {
-    fprintf(stderr, "[SDNA] child still alive, sending SIGTERM\n");
+    fprintf(stderr, "[Geno] child still alive, sending SIGTERM\n");
     kill(mChildPid, SIGTERM);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     if (waitpid(mChildPid, nullptr, WNOHANG) == 0) {
-      fprintf(stderr, "[SDNA] child still alive, sending SIGKILL\n");
+      fprintf(stderr, "[Geno] child still alive, sending SIGKILL\n");
       kill(mChildPid, SIGKILL);
       waitpid(mChildPid, nullptr, 0);
     }
@@ -759,7 +759,7 @@ void IWebViewImpl::CloseWebView()
   mChildPid = 0;
   mChildXid = 0;
   mInitialized = false;
-  fprintf(stderr, "[SDNA] CloseWebView EXIT\n");
+  fprintf(stderr, "[Geno] CloseWebView EXIT\n");
 }
 
 // ===================================================================
@@ -781,10 +781,10 @@ void IWebViewImpl::LoadHTML(const char* html)
   // paths resolve correctly inside WebKit (webkit_web_view_load_html with
   // a base URI doesn't reliably fetch file:// resources).
   std::string idxPath = FindIndexPath();
-  fprintf(stderr, "[SDNA] LoadHTML: idxPath=%s\n", idxPath.empty() ? "(empty)" : idxPath.c_str());
+  fprintf(stderr, "[Geno] LoadHTML: idxPath=%s\n", idxPath.empty() ? "(empty)" : idxPath.c_str());
   if (!idxPath.empty()) {
     std::string uri = "file://" + idxPath;
-    fprintf(stderr, "[SDNA] LoadHTML -> LOAD_URI %s\n", uri.c_str());
+    fprintf(stderr, "[Geno] LoadHTML -> LOAD_URI %s\n", uri.c_str());
     Send("LOAD_URI %s", uri.c_str());
     Send("RESIZE %d %d", mLastW, mLastH);
     DrainEvents();

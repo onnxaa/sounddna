@@ -5,21 +5,21 @@
 #include <algorithm>
 #include <sndfile.h>
 
-#include "SDNA_Types.h"
-#include "SDNA_FFT.h"
-#include "SDNA_Analyzer.h"
-#include "SDNA_SpectralProcessor.h"
-#include "SDNA_DynamicsProcessor.h"
-#include "SDNA_StereoProcessor.h"
-#include "SDNA_NoiseProcessor.h"
-#include "SDNA_TextureProcessor.h"
-#include "SDNA_AirProcessor.h"
-#include "SDNA_MovementProcessor.h"
-#include "SDNA_SpaceProcessor.h"
-#include "SDNA_GlueProcessor.h"
-#include "SDNA_ResonanceProcessor.h"
-#include "SDNA_TransferEngine.h"
-#include "SDNA_MorphEngine.h"
+#include "Geno_Types.h"
+#include "Geno_FFT.h"
+#include "Geno_Analyzer.h"
+#include "Geno_SpectralProcessor.h"
+#include "Geno_DynamicsProcessor.h"
+#include "Geno_StereoProcessor.h"
+#include "Geno_NoiseProcessor.h"
+#include "Geno_TextureProcessor.h"
+#include "Geno_AirProcessor.h"
+#include "Geno_MovementProcessor.h"
+#include "Geno_SpaceProcessor.h"
+#include "Geno_GlueProcessor.h"
+#include "Geno_ResonanceProcessor.h"
+#include "Geno_TransferEngine.h"
+#include "Geno_MorphEngine.h"
 
 static constexpr double kSR = 44100.0;
 static constexpr int kLen = (int)(kSR * 3);
@@ -115,7 +115,7 @@ bool saveWav(const char* path, const std::vector<float>& L,
   return true;
 }
 
-void printProfile(const DNAProfile& p, const char* label) {
+void printProfile(const GenoProfile& p, const char* label) {
   printf("\n=== %s ===\n", label);
   printf("  Pitch: %.1f Hz (conf: %.2f)\n", p.spectral.pitch, p.spectral.pitchConfidence);
   printf("  Centroid: %.1f Hz | Brightness: %.3f\n", p.spectral.centroid, p.spectral.brightness);
@@ -172,9 +172,9 @@ int testAnalyzer() {
                       genPercussive(), genNoiseFloor(), genWideStereo()};
   for (auto& t : tones) {
     printf("--- %s ---\n", t.name.c_str());
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(t.L.data(), t.R.data(), kLen, true, p);
     printProfile(p, t.name.c_str());
   }
@@ -288,9 +288,9 @@ int testTransfer() {
   printf("=== Transfer ===\n");
   auto src = genComplex();
   auto tgt = genPercussive();
-  DNAAnalyzer an;
+  GenoAnalyzer an;
   an.SetSampleRate(kSR);
-  DNAProfile sP, tP;
+  GenoProfile sP, tP;
   an.ComputeFullAnalysis(src.L.data(), src.R.data(), kLen, true, sP);
   an.ComputeFullAnalysis(tgt.L.data(), tgt.R.data(), kLen, true, tP);
   printProfile(sP, "SOURCE");
@@ -300,7 +300,7 @@ int testTransfer() {
   eng.SetSampleRate(kSR);
   eng.SetSourceProfile(sP);
   eng.SetTargetProfile(tP);
-  DNATransferParams params;
+  GenoTransferParams params;
   params.amounts.fill(0.8);
   eng.SetTransferParams(params);
   std::vector<float> oL(kLen), oR(kLen);
@@ -308,7 +308,7 @@ int testTransfer() {
   saveWav("/tmp/sounddna_src.wav", src.L, src.R);
   saveWav("/tmp/sounddna_tgt.wav", tgt.L, tgt.R);
   saveWav("/tmp/sounddna_out.wav", oL, oR);
-  DNAProfile oP;
+  GenoProfile oP;
   an.ComputeFullAnalysis(oL.data(), oR.data(), kLen, true, oP);
   printProfile(oP, "OUTPUT");
   return 0;
@@ -318,9 +318,9 @@ int testMorph() {
   printf("=== Morph ===\n");
   auto a = genSine(220);
   auto b = genSine(880);
-  DNAAnalyzer an;
+  GenoAnalyzer an;
   an.SetSampleRate(kSR);
-  DNAProfile pA, pB;
+  GenoProfile pA, pB;
   an.ComputeFullAnalysis(a.L.data(), a.R.data(), kLen, true, pA);
   an.ComputeFullAnalysis(b.L.data(), b.R.data(), kLen, true, pB);
   MorphEngine morph;

@@ -90,12 +90,12 @@ function BPCFUI(paramIdx) {
 }
 
 // ============================================================
-// SoundDNA Application Bridge & Utilities
+// Geno Application Bridge & Utilities
 // ============================================================
 
-window.SDNA = window.SDNA || {};
+window.GENO = window.GENO || {};
 
-SDNA.utils = {
+GENO.utils = {
   clamp: (v, min, max) => Math.min(Math.max(v, min), max),
 
   dbToAmp: (db) => Math.pow(10, db / 20),
@@ -170,7 +170,7 @@ SDNA.utils = {
   ]
 };
 
-SDNA.Bridge = {
+GENO.Bridge = {
   sendMessage: (msgTag, data) => {
     if (typeof SAMFUI !== 'undefined') {
       SAMFUI(msgTag, -1, data || '');
@@ -184,38 +184,38 @@ SDNA.Bridge = {
   },
 
   requestParameters: () => {
-    SDNA.Bridge.sendMessage(13, '');
+    GENO.Bridge.sendMessage(13, '');
   },
 
   analyzeSource: () => {
-    SDNA.Bridge.sendMessage(0, '');
+    GENO.Bridge.sendMessage(0, '');
   },
 
   analyzeTarget: () => {
-    SDNA.Bridge.sendMessage(1, '');
+    GENO.Bridge.sendMessage(1, '');
   },
 
   loadDNA: (json) => {
-    SDNA.Bridge.sendMessage(2, btoa(JSON.stringify(json)));
+    GENO.Bridge.sendMessage(2, btoa(JSON.stringify(json)));
   },
 
   saveDNA: (json) => {
-    SDNA.Bridge.sendMessage(3, btoa(JSON.stringify(json)));
+    GENO.Bridge.sendMessage(3, btoa(JSON.stringify(json)));
   },
 
   morphAdd: (profile) => {
-    SDNA.Bridge.sendMessage(6, btoa(JSON.stringify(profile)));
+    GENO.Bridge.sendMessage(6, btoa(JSON.stringify(profile)));
   },
 
   morphClear: () => {
-    SDNA.Bridge.sendMessage(7, '');
+    GENO.Bridge.sendMessage(7, '');
   },
 
   searchBrowser: (query) => {
-    SDNA.Bridge.sendMessage(8, btoa(JSON.stringify(query)));
+    GENO.Bridge.sendMessage(8, btoa(JSON.stringify(query)));
   },
 
   compareProfiles: (profileA, profileB) => {
-    SDNA.Bridge.sendMessage(10, btoa(JSON.stringify({ a: profileA, b: profileB })));
+    GENO.Bridge.sendMessage(10, btoa(JSON.stringify({ a: profileA, b: profileB })));
   }
 };
