@@ -17,6 +17,7 @@ public:
   void AddPoint(const GenoProfile& profile, double position, double blend = 1.0);
   void Clear();
   void SetMorphPosition(double position); // 0.0 to 1.0
+  bool HasPoints() const { return !mMorphPoints.empty(); }
 
   GenoProfile GetCurrentMorph() const;
   std::vector<MorphPoint> GetPoints() const { return mMorphPoints; }

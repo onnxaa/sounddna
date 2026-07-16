@@ -129,6 +129,16 @@ void SpectralProcessor::Process(const float* input, float* output, int numSample
     return;
   }
 
+  {
+    static int sc = 0;
+    if (++sc % 500 == 0) {
+      float inPeak = 0;
+      for (int i = 0; i < numSamples; ++i)
+        if (std::fabs(input[i]) > inPeak) inPeak = std::fabs(input[i]);
+      fprintf(stderr, "[DBUG] SpecProc: smoothAmt=%.3f inPeak=%.4f filter0=%.3f\n", mSmoothAmount, inPeak, mSpectralFilter.empty() ? 1.0 : mSpectralFilter[0]);
+    }
+  }
+
   for (size_t j = 0; j < mCurrentFilter.size(); ++j)
     mCurrentFilter[j] = 1.0 + (mSpectralFilter[j] - 1.0) * mSmoothAmount;
 
@@ -170,5 +180,19 @@ void SpectralProcessor::Process(const float* input, float* output, int numSample
       }
     }
     pos += chunk;
+  }
+
+  {
+    static int sec = 0;
+    if (++sec % 500 == 0) {
+      float outPeak = 0;
+      bool hasNan = false;
+      for (int i = 0; i < numSamples; ++i) {
+        if (std::fabs(output[i]) > outPeak) outPeak = std::fabs(output[i]);
+        if (output[i] != output[i]) hasNan = true;
+      }
+      if (hasNan) fprintf(stderr, "[DBUG] SpecProc: *** NaN DETECTED in output! ***\n");
+      fprintf(stderr, "[DBUG] SpecProc: outPeak=%.4f\n", outPeak);
+    }
   }
 }

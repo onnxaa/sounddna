@@ -324,7 +324,7 @@ target_include_directories(_${PROJECT_NAME}-base INTERFACE
   ${SNDFILE_INCLUDE_DIRS}
 )
 target_compile_options(_${PROJECT_NAME}-base INTERFACE
-  -include "${CMAKE_CURRENT_SOURCE_DIR}/config.h"
+  "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/config.h"
 )
 
 # ── WebView helper binary ────────────────────────────────────────────
@@ -376,9 +376,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET ${PROJECT_NAME}-clap)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "$<TARGET_FILE:WebViewHelper>"
       "${CLAP_DEPLOY_DIR}/WebViewHelper"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${CMAKE_SOURCE_DIR}/resources/web"
-      "${CLAP_DEPLOY_DIR}/resources/web"
     COMMENT "Deploying CLAP to ${CLAP_DEPLOY_DIR}"
   )
 endif()

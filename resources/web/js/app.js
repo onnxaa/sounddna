@@ -64,6 +64,13 @@ class GenoApp {
     switch (msgTag) {
       case 14: {
         if (GENO.analyzer) GENO.analyzer.updateReport(json);
+        if (json && json.features) {
+          if (json.type === 'target') {
+            this.onTargetProfile(json);
+          } else if (json.type === 'source') {
+            this.onSourceProfile(json);
+          }
+        }
         break;
       }
       case 15: {
@@ -97,32 +104,38 @@ class GenoApp {
     GENO.Bridge.sendMessage(18, '');
   }
 
-  handleDrop(event, type) {
-    event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (!file) return;
-
-    // WebKit exposes the full filesystem path on dropped files
-    if (file.path) {
-      this.loadFile(file.path, type);
-    } else if (file.name) {
-      this.loadFile(file.name, type);
+  openFileDialog(type) {
+    console.log('[GenoUI] openFileDialog type=' + type);
+    const target = window.webkit?.messageHandlers?.iPlug;
+    if (target) {
+      target.postMessage(JSON.stringify({msg: "FILE_DIALOG", type: type}));
+      console.log('[GenoUI] FILE_DIALOG posted to helper');
+    } else {
+      console.log('[GenoUI] ERROR: no webkit.messageHandlers.iPlug');
     }
   }
 
   loadFile(path, type) {
+    console.log('[GenoUI] loadFile path=' + path + ' type=' + type);
     const tag = type === 'source' ? 17 : 16;
-    GENO.Bridge.sendMessage(tag, path);
-
+    // Base64-encode path because OnMessageFromWebView base64-decodes the data field
+    const encoded = btoa(path);
+    GENO.Bridge.sendMessage(tag, encoded);
+    console.log('[GenoUI] sent tag=' + tag + ' encoded=' + encoded + ' to DSP');
+    const name = path.split(/[/\\]/).pop();
     if (type === 'target') {
-      const dropzone = document.getElementById('targetDropzone');
-      if (dropzone) {
-        dropzone.classList.add('has-data');
-        dropzone.querySelector('.dropzone-text').textContent = path.split(/[/\\]/).pop();
+      let el = document.getElementById('targetFileName');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'targetFileName';
+        el.style.cssText = 'font-size:11px;color:var(--accent);margin-bottom:4px';
+        const report = document.getElementById('targetReport');
+        if (report) report.parentNode.insertBefore(el, report);
       }
+      el.textContent = 'Loaded: ' + name;
     } else if (type === 'source') {
       const badge = document.getElementById('sourceBadge');
-      if (badge) badge.textContent = path.split(/[/\\]/).pop();
+      if (badge) badge.textContent = name;
     }
   }
 
@@ -194,6 +207,67 @@ class GenoApp {
     if (GENO.compare) GENO.compare.show(a, b);
   }
 
+  featuresToMap(f) {
+    const c = GENO.utils.clamp;
+    return {
+      x: c(f.brightness || 0.5, 0, 1),
+      y: c((f.dynamicRange || 18) / 30, 0, 1),
+      z: c(((f.noiseFloor !== undefined ? f.noiseFloor : -90) + 120) / 90, 0, 1)
+    };
+  }
+
+  applyProfileToGenes(f) {
+    if (!GENO.transfer) return;
+    const c = GENO.utils.clamp;
+    const br = f.brightness || 0.5;
+    const dr = f.dynamicRange || 18;
+    const nf = f.noiseFloor !== undefined ? f.noiseFloor : -90;
+    const ct = f.centroid || 3000;
+    const fl = f.flatness || 0.3;
+    const cf = f.crestFactor || 10;
+    const sw = f.stereoWidth || 0.5;
+    const pc = f.phaseCorrelation !== undefined ? f.phaseCorrelation : 0.5;
+    const sat = f.saturation || 0.3;
+    const dist = f.distortion || 0.2;
+
+    const normCentroid = c(ct / 5000, 0, 1);
+
+    GENO.transfer.setGeneAmount(0,  c(br, 0, 1));
+    GENO.transfer.setGeneAmount(1,  c(dr / 30, 0, 1));
+    GENO.transfer.setGeneAmount(2,  c((nf + 120) / 90, 0, 1));
+    GENO.transfer.setGeneAmount(3,  c(1 - (pc + 1) / 2, 0, 1));
+    GENO.transfer.setGeneAmount(4,  c(fl, 0, 1));
+    GENO.transfer.setGeneAmount(5,  c(sw, 0, 1));
+    GENO.transfer.setGeneAmount(6,  c((sat + dist) / 2, 0, 1));
+    GENO.transfer.setGeneAmount(7,  c(cf / 20, 0, 1));
+    GENO.transfer.setGeneAmount(8,  c(1 - normCentroid, 0, 1));
+    GENO.transfer.setGeneAmount(9,  c(1 - fl, 0, 1));
+    GENO.transfer.setGeneAmount(10, c(1 - normCentroid, 0, 1));
+    GENO.transfer.setGeneAmount(11, c(normCentroid, 0, 1));
+    GENO.transfer.setGeneAmount(12, c(1 - dr / 30, 0, 1));
+    GENO.transfer.setGeneAmount(13, c(br, 0, 1));
+  }
+
+  onTargetProfile(json) {
+    const f = json.features || {};
+    const map = GENO.dnaMap;
+    if (map) {
+      const { x, y, z } = this.featuresToMap(f);
+      map.updatePoint('Target', x, y, z, '#ff6b6b');
+    }
+    this.applyProfileToGenes(f);
+  }
+
+  onSourceProfile(json) {
+    const badge = document.getElementById('sourceBadge');
+    if (badge) badge.textContent = json.name || 'Custom DNA';
+    const map = GENO.dnaMap;
+    if (map) {
+      const { x, y, z } = this.featuresToMap(json.features || {});
+      map.updatePoint('Source', x, y, z, '#00cec9');
+    }
+  }
+
   closeCompare() {
     if (GENO.compare) GENO.compare.close();
   }
@@ -203,30 +277,15 @@ class GenoApp {
   }
 
   analyzeSource() {
+    console.log('[GenoUI] analyzeSource clicked');
     GENO.Bridge.analyzeSource();
   }
 
   analyzeTarget() {
+    console.log('[GenoUI] analyzeTarget clicked');
     GENO.Bridge.analyzeTarget();
   }
 
-  onAudioFileSelected(input) {
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    if (file.path) {
-      this.loadFile(file.path, 'target');
-    }
-    input.value = '';
-  }
-
-  onDNAFileSelected(input) {
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    if (file.path) {
-      this.loadFile(file.path, 'source');
-    }
-    input.value = '';
-  }
 }
 
 window.app = new GenoApp();

@@ -80,7 +80,65 @@ static gboolean on_script_msg(WebKitUserContentManager*, WebKitJavascriptResult*
   if (str) {
     for (char* p = str; *p; ++p) if (*p == '\n') *p = ' ';
     fprintf(stderr, "[WvH] SCRIPT_MSG: %s\n", str);
-    dprintf(STDOUT_FILENO, "SCRIPT_MSG %s\n", str);
+
+    // Handle FILE_DIALOG request — open native file chooser and inject path
+    if (strncmp(str, "{\"msg\":\"FILE_DIALOG\"", 19) == 0) {
+      // Quick JSON parse for "type" field
+      const char* type = strstr(str, "\"type\":\"");
+      const char* dialogType = "target";
+      if (type) {
+        type += 8; // skip "type":"
+        if (strncmp(type, "source", 6) == 0) dialogType = "source";
+      }
+
+      GtkWindow* parentWindow = g_state ? GTK_WINDOW(g_state->window) : nullptr;
+      GtkWidget* dialog = gtk_file_chooser_dialog_new(
+          dialogType[0] == 's' ? "Select DNA File" : "Select Audio File",
+          parentWindow, GTK_FILE_CHOOSER_ACTION_OPEN,
+          "_Cancel", GTK_RESPONSE_CANCEL,
+          "_Open", GTK_RESPONSE_ACCEPT, nullptr);
+
+      GtkFileFilter* filter = gtk_file_filter_new();
+      if (dialogType[0] == 's') {
+        gtk_file_filter_set_name(filter, "DNA Files (*.dna, *.json)");
+        gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+        gtk_file_filter_add_pattern(filter, "*.dna");
+        gtk_file_filter_add_pattern(filter, "*.json");
+      } else {
+        gtk_file_filter_set_name(filter, "Audio Files (*.wav, *.aiff, *.flac)");
+        gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+        gtk_file_filter_add_pattern(filter, "*.wav");
+        gtk_file_filter_add_pattern(filter, "*.aiff");
+        gtk_file_filter_add_pattern(filter, "*.aif");
+        gtk_file_filter_add_pattern(filter, "*.flac");
+      }
+
+      if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        char* path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        if (path && g_state && g_state->webview) {
+          std::string escaped;
+          for (const char* p = path; *p; ++p) {
+            if (*p == '\\') escaped += "\\\\";
+            else if (*p == '\'') escaped += "\\'";
+            else if (*p == '"') escaped += "\\\"";
+            else escaped += *p;
+          }
+          std::string js = "try{window.app.loadFile('" + escaped + "','" + std::string(dialogType) + "');}catch(e){}";
+          webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(g_state->webview), js.c_str(), -1, nullptr, nullptr, nullptr, nullptr, nullptr);
+          g_free(path);
+        }
+      }
+      struct Dlg { GtkWidget* d; };
+      auto* dlgClose = new Dlg{dialog};
+      g_idle_add_full(G_PRIORITY_LOW, [](gpointer data) -> gboolean {
+        auto* d = static_cast<Dlg*>(data);
+        if (d->d) gtk_widget_destroy(d->d);
+        delete d;
+        return G_SOURCE_REMOVE;
+      }, dlgClose, nullptr);
+    } else {
+      dprintf(STDOUT_FILENO, "SCRIPT_MSG %s\n", str);
+    }
     g_free(str);
   }
   return TRUE;

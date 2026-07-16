@@ -2,6 +2,8 @@
 #include "IPlug_include_in_plug_src.h"
 #include "IPlugPaths.h"
 #include <cstring>
+#include <cmath>
+
 #include <sstream>
 #include <algorithm>
 #include <cstdlib>
@@ -72,6 +74,28 @@ void GenoPlugin::ProcessBlock(sample** inputs, sample** outputs, int nFrames) {
   sample* outL = outputs[0];
   sample* outR = outputs[1];
 
+  {
+    static int rc = 0; ++rc;
+    float rPkL = 0, rPkF = 0, rOutPkL = 0, rOutPkR = 0;
+    int firstNZ = -1;
+    for (int s = 0; s < nFrames; ++s) {
+      float fL = (float)inL[s], fR = (float)inR[s];
+      if (fabsf(fL) > rPkL) rPkL = fabsf(fL);
+      if (fabsf(fR) > rPkF) rPkF = fabsf(fR);
+      if (firstNZ < 0 && (fL != 0.0f || fR != 0.0f)) firstNZ = s;
+    }
+    for (int s = 0; s < nFrames; ++s) {
+      float fL = (float)outL[s], fR = (float)outR[s];
+      if (fabsf(fL) > rOutPkL) rOutPkL = fabsf(fL);
+      if (fabsf(fR) > rOutPkR) rOutPkR = fabsf(fR);
+    }
+    if (rc % 500 == 0 || firstNZ >= 0) {
+      fprintf(stderr, "[DBUG] RAW: rc=%d nz=%d i(%.6f/%.6f) o(%.6f/%.6f) iG=%.6f oG=%.6f mix=%.3f in0=%p out0=%p sz=%zu\n",
+              rc, firstNZ, rPkL, rPkF, rOutPkL, rOutPkR, inputGain, outputGain, mix,
+              (void*)inL, (void*)outL, sizeof(sample));
+    }
+  }
+
   if (mBypass) {
     for (int s = 0; s < nFrames; s++) {
       outL[s] = inL[s] * inputGain * outputGain;
@@ -102,6 +126,22 @@ void GenoPlugin::ProcessBlock(sample** inputs, sample** outputs, int nFrames) {
   mTransferEngine.Process(dryL.data(), dryR.data(),
                            wetL.data(), wetR.data(), nFrames, true);
 
+  {
+    static int cnt = 0;
+    if (++cnt % 500 == 0) {
+      float wPkL = 0, wPkR = 0, dPkL = 0, dPkR = 0;
+      for (int s = 0; s < nFrames; ++s) {
+        if (std::fabs(wetL[s]) > wPkL) wPkL = std::fabs(wetL[s]);
+        if (std::fabs(wetR[s]) > wPkR) wPkR = std::fabs(wetR[s]);
+        if (std::fabs(dryL[s]) > dPkL) dPkL = std::fabs(dryL[s]);
+        if (std::fabs(dryR[s]) > dPkR) dPkR = std::fabs(dryR[s]);
+      }
+      fprintf(stderr, "[DBUG] PB: nF=%d mix=%.3f bp=%d sL=%d tL=%d inPk=%.4f/%.4f wetPk=%.4f/%.4f\n",
+              nFrames, mix, mBypass, mTransferEngine.GetSourceLoaded(), mTransferEngine.GetTargetLoaded(),
+              dPkL, dPkR, wPkL, wPkR);
+    }
+  }
+
   for (int s = 0; s < nFrames; s++) {
     float blendedL = dryL[s] * (1.f - (float)mix) + wetL[s] * (float)mix;
     float blendedR = dryR[s] * (1.f - (float)mix) + wetR[s] * (float)mix;
@@ -119,6 +159,7 @@ void GenoPlugin::OnReset() {
 }
 
 void GenoPlugin::OnIdle() {
+  DrainHelperEvents();
   if (mAnalysisPending.load(std::memory_order_acquire)) {
     std::lock_guard<std::mutex> lock(mAnalysisMutex);
     GenoProfile profile = mPendingProfile;
@@ -186,6 +227,29 @@ static std::string ExtractJSONObject(const char* json, const char* key) {
   return std::string(start, p - start);
 }
 
+// Lightweight JSON array extractor: parses [v1,v2,...,vN]
+static std::vector<double> ExtractJSONArray(const char* json, const char* key) {
+  std::vector<double> result;
+  const char* p = strstr(json, key);
+  if (!p) return result;
+  p = strchr(p, ':');
+  if (!p) return result;
+  ++p;
+  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) ++p;
+  if (*p != '[') return result;
+  ++p;
+  while (*p && *p != ']') {
+    while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == ',')) ++p;
+    if (*p == ']') break;
+    char* end = nullptr;
+    double v = strtod(p, &end);
+    if (end == p) break;
+    result.push_back(v);
+    p = end;
+  }
+  return result;
+}
+
 static void ParseGenoProfileJSON(const char* json, GenoProfile& profile) {
   profile.spectral.centroid = ExtractJSONDouble(json, "centroid");
   profile.spectral.brightness = ExtractJSONDouble(json, "brightness");
@@ -197,10 +261,21 @@ static void ParseGenoProfileJSON(const char* json, GenoProfile& profile) {
   profile.noise.noiseFloorDb = ExtractJSONDouble(json, "noiseFloor");
   profile.texture.saturationAmount = ExtractJSONDouble(json, "saturation");
   profile.texture.harmonicDistortion = ExtractJSONDouble(json, "distortion");
+  profile.texture.analogWarmth = ExtractJSONDouble(json, "analogWarmth");
+  profile.texture.tapeSaturation = ExtractJSONDouble(json, "tapeSaturation");
+  profile.noise.spectralTilt = ExtractJSONDouble(json, "spectralTilt");
+  profile.spectral.pitch = ExtractJSONDouble(json, "pitch");
+  profile.spectral.rolloff = ExtractJSONDouble(json, "rolloff");
+  profile.spectral.spread = ExtractJSONDouble(json, "spread");
   profile.confidence = ExtractJSONDouble(json, "confidence", 1.0);
   profile.sourceName = ExtractJSONString(json, "name");
   profile.instrument = ExtractJSONString(json, "instrument");
   profile.category = ExtractJSONString(json, "category");
+  profile.spectral.spectralEnvelope = ExtractJSONArray(json, "spectralEnvelope");
+  profile.spectral.harmonicProfile = ExtractJSONArray(json, "harmonicProfile");
+  auto ns = ExtractJSONArray(json, "noiseShape");
+  for (size_t i = 0; i < ns.size() && i < kNumNoiseCoefs; ++i)
+    profile.noise.noiseShape[i] = ns[i];
 }
 
 bool GenoPlugin::ValidateBufferEnergy(const float* audio, int numSamples) {
@@ -271,8 +346,9 @@ bool GenoPlugin::OnMessage(int msgTag, int ctrlTag, int dataSize, const void* pD
 
     case kMsgTagAnalyzeSource: {
       if (mCircAvail.load(std::memory_order_acquire)) {
+        int wp = mCircWritePos.load(std::memory_order_acquire);
         GenoProfile profile;
-        RunAnalysis(kMaxBufferSamples, true, profile);
+        RunAnalysis(wp, true, profile);
         if (profile.confidence > 0.0) {
           std::lock_guard<std::mutex> lock(mAnalysisMutex);
           mPendingProfile = profile;
@@ -285,8 +361,9 @@ bool GenoPlugin::OnMessage(int msgTag, int ctrlTag, int dataSize, const void* pD
 
     case kMsgTagAnalyzeTarget: {
       if (mCircAvail.load(std::memory_order_acquire)) {
+        int wp = mCircWritePos.load(std::memory_order_acquire);
         GenoProfile profile;
-        RunAnalysis(kMaxBufferSamples, true, profile);
+        RunAnalysis(wp, true, profile);
         if (profile.confidence > 0.0) {
           std::lock_guard<std::mutex> lock(mAnalysisMutex);
           mPendingProfile = profile;
@@ -545,8 +622,10 @@ void GenoPlugin::OnParamChange(int paramIdx) {
 
     case kMorphPosition: {
       mMorphEngine.SetMorphPosition(GetParam(kMorphPosition)->Value() / 100.0);
-      auto morphed = mMorphEngine.GetCurrentMorph();
-      mTransferEngine.SetSourceProfile(morphed);
+      if (mMorphEngine.HasPoints()) {
+        auto morphed = mMorphEngine.GetCurrentMorph();
+        mTransferEngine.SetSourceProfile(morphed);
+      }
       break;
     }
   }
@@ -642,8 +721,36 @@ void GenoPlugin::SendGenoProfileToUI(const GenoProfile& profile, const char* typ
   json << "\"phaseCorrelation\":" << profile.stereo.phaseCorrelation << ",";
   json << "\"noiseFloor\":" << profile.noise.noiseFloorDb << ",";
   json << "\"saturation\":" << profile.texture.saturationAmount << ",";
-  json << "\"distortion\":" << profile.texture.harmonicDistortion;
+  json << "\"distortion\":" << profile.texture.harmonicDistortion << ",";
+  json << "\"analogWarmth\":" << profile.texture.analogWarmth << ",";
+  json << "\"tapeSaturation\":" << profile.texture.tapeSaturation << ",";
+  json << "\"spectralTilt\":" << profile.noise.spectralTilt << ",";
+  json << "\"pitch\":" << profile.spectral.pitch << ",";
+  json << "\"rolloff\":" << profile.spectral.rolloff << ",";
+  json << "\"spread\":" << profile.spectral.spread;
   json << "}";
+
+  json << ",\"spectralEnvelope\":[";
+  for (size_t i = 0; i < profile.spectral.spectralEnvelope.size(); ++i) {
+    if (i > 0) json << ",";
+    json << profile.spectral.spectralEnvelope[i];
+  }
+  json << "]";
+
+  json << ",\"harmonicProfile\":[";
+  for (size_t i = 0; i < profile.spectral.harmonicProfile.size(); ++i) {
+    if (i > 0) json << ",";
+    json << profile.spectral.harmonicProfile[i];
+  }
+  json << "]";
+
+  json << ",\"noiseShape\":[";
+  for (int i = 0; i < kNumNoiseCoefs; ++i) {
+    if (i > 0) json << ",";
+    json << profile.noise.noiseShape[i];
+  }
+  json << "]";
+
   json << "}";
 
   WDL_String str(json.str().c_str());

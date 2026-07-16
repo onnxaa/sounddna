@@ -53,8 +53,8 @@ private:
 
   // Circular buffer for audio capture
   static constexpr int kMaxBufferSamples = 44100 * 5; // 5 seconds
-  std::vector<float> mCircBufL{kMaxBufferSamples, 0.f};
-  std::vector<float> mCircBufR{kMaxBufferSamples, 0.f};
+  std::vector<float> mCircBufL = std::vector<float>(kMaxBufferSamples, 0.f);
+  std::vector<float> mCircBufR = std::vector<float>(kMaxBufferSamples, 0.f);
   std::atomic<int> mCircWritePos{0};
   std::atomic<int> mCircAvail{0};
   std::atomic<bool> mCapturing{false};

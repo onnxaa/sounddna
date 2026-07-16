@@ -84,6 +84,17 @@ void DynamicsProcessor::Process(const float* input, float* output, int numSample
 
   double sourceDR = std::max(mSource.dynamicRange, 1.0);
   double targetDR = std::max(mTarget.dynamicRange, 1.0);
+
+  {
+    static int dc = 0;
+    if (++dc % 500 == 0) {
+      float inPeak = 0;
+      for (int i = 0; i < numSamples; ++i)
+        if (std::fabs(input[i]) > inPeak) inPeak = std::fabs(input[i]);
+      fprintf(stderr, "[DBUG] DynProc: sDR=%.1f tDR=%.1f amt=%.3f inPk=%.4f gSmooth=%.3f\n",
+              sourceDR, targetDR, mSmoothAmount, inPeak, mGainSmooth);
+    }
+  }
   double rangeRatio = targetDR / sourceDR;
   rangeRatio = 1.0 + (rangeRatio - 1.0) * mSmoothAmount;
 

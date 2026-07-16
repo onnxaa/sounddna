@@ -33,6 +33,22 @@ class GenoMap {
     this.points = pts.map(p => ({ ...p, selected: false }));
   }
 
+  updatePoint(name, x, y, z, color) {
+    const idx = this.points.findIndex(p => p.name === name);
+    const pt = { name, x, y, z, color, selected: false };
+    if (idx >= 0) {
+      this.points[idx] = pt;
+    } else {
+      this.points.push(pt);
+    }
+    this.render();
+  }
+
+  removePoint(name) {
+    this.points = this.points.filter(p => p.name !== name);
+    this.render();
+  }
+
   setPoints(pts) {
     this.points = pts;
     this.render();

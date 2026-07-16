@@ -63,8 +63,8 @@ void NoiseProcessor::Process(const float* input, float* output, int numSamples) 
     return;
   }
 
-  double noiseDiffDb = mTarget.noiseFloorDb - mSource.noiseFloorDb;
-  double noiseGain = std::pow(10.0, (noiseDiffDb * mSmoothAmount) / 20.0);
+  double noiseDb = mSource.noiseFloorDb + (mTarget.noiseFloorDb - mSource.noiseFloorDb) * mSmoothAmount;
+  double noiseGain = std::pow(10.0, noiseDb / 20.0);
   double tiltDiff = mTarget.spectralTilt - mSource.spectralTilt;
   double tiltAmount = tiltDiff * mSmoothAmount * 0.1;
 

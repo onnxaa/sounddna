@@ -7,7 +7,7 @@
 #define PLUG_URL_STR "https://geno.dev"
 #define PLUG_EMAIL_STR "dev@geno.dev"
 #define PLUG_COPYRIGHT_STR "Copyright 2025 Geno Audio"
-#define PLUG_CLASS_NAME Geno
+#define PLUG_CLASS_NAME GenoPlugin
 
 #define BUNDLE_NAME "Geno"
 #define BUNDLE_MFR "Geno"

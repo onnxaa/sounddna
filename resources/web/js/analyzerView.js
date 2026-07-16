@@ -18,12 +18,18 @@ class DNAAnalyzerUI {
       if (badge) badge.textContent = data.name || 'Custom DNA';
     }
 
+    const f = data.features || data;
     if (data.instrument) setText('targetInstrument', data.instrument);
-    if (data.confidence) setText('targetConfidence', (data.confidence * 100).toFixed(0) + '%');
-    if (data.pitch) setText('targetPitch', data.pitch.toFixed(1) + ' Hz');
-    if (data.dynamicRange) setText('targetDR', data.dynamicRange.toFixed(1) + ' dB');
-    if (data.brightness) setText('targetBrightness', (data.brightness * 100).toFixed(0) + '%');
-    if (data.noiseFloor) setText('targetNoise', data.noiseFloor.toFixed(1) + ' dB');
+    if (data.confidence !== undefined && data.confidence !== null)
+      setText('targetConfidence', (data.confidence * 100).toFixed(0) + '%');
+    if (f.pitch !== undefined && f.pitch !== null)
+      setText('targetPitch', f.pitch.toFixed(1) + ' Hz');
+    if (f.dynamicRange !== undefined && f.dynamicRange !== null)
+      setText('targetDR', f.dynamicRange.toFixed(1) + ' dB');
+    if (f.brightness !== undefined && f.brightness !== null)
+      setText('targetBrightness', (f.brightness * 100).toFixed(0) + '%');
+    if (f.noiseFloor !== undefined && f.noiseFloor !== null)
+      setText('targetNoise', f.noiseFloor.toFixed(1) + ' dB');
 
     if (data.spectralEnvelope && data.harmonicProfile) {
       this.drawSpectralPlot(data.spectralEnvelope, data.harmonicProfile);

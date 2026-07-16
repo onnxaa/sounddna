@@ -42,6 +42,12 @@ void GenoAnalyzer::ComputeFullAnalysis(const float* audioL, const float* audioR,
   AnalyzeTexture(audioL, numSamples, rms, out.spectral.pitch, out.texture);
   AnalyzeSpace(audioL, numSamples, out.space);
   AnalyzeMovement(audioL, numSamples, out.movement);
+
+  double pitchScore = out.spectral.pitchConfidence;
+  double snrScore = std::clamp((out.noise.signalToNoise - 10.0) / 50.0, 0.0, 1.0);
+  double flatnessScore = 1.0 - std::min(1.0, out.spectral.spectralFlatness * 2.0);
+  double energyScore = std::min(1.0, rms * 10.0);
+  out.confidence = std::clamp(0.3 * pitchScore + 0.3 * snrScore + 0.2 * flatnessScore + 0.2 * energyScore, 0.0, 1.0);
 }
 
 void GenoAnalyzer::AnalyzeSpectral(const float* audio, int numSamples,

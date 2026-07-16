@@ -410,15 +410,12 @@ public:
   void SetWebViewBounds(float x, float y, float w, float h, float scale);
   void GetWebRoot(WDL_String& path) const { path.Set(mWebRoot.Get()); }
   void GetLocalDownloadPathForFile(const char* fileName, WDL_String& downloadPath);
+  // Drain pending events from the helper process (non-blocking)
+  void DrainEvents();
 
 private:
-  // Send a command line to the child (appends \n internally)
   void Send(const char* fmt, ...);
-  // Read one event line from the child (blocking, with timeout)
-  // Returns false on EOF / timeout.
   bool ReadEvent(char* buf, size_t len, int timeoutMs = -1);
-  // Drain pending events (non-blocking)
-  void DrainEvents();
 
   IWebView* mIWebView = nullptr;
 
@@ -757,6 +754,11 @@ void IWebViewImpl::CloseWebView()
     if (mReadFd >= 0)  { close(mReadFd);  mReadFd  = -1; }
   }
 
+  // Clean up per-instance temp HTML file
+  char tmpPath[PATH_MAX];
+  snprintf(tmpPath, sizeof(tmpPath), "/tmp/geno_ui_%d_%p.html", getpid(), (void*)this);
+  unlink(tmpPath);
+
   mChildPid = 0;
   mChildXid = 0;
   mInitialized = false;
@@ -776,30 +778,33 @@ void IWebViewImpl::HideWebView(bool hide)
 
 void IWebViewImpl::LoadHTML(const char* html)
 {
-  if (mClosed.load()) return;
+  if (mClosed.load() || !html) return;
 
-  // Try loading from the actual index.html file so that relative CSS/JS
-  // paths resolve correctly inside WebKit (webkit_web_view_load_html with
-  // a base URI doesn't reliably fetch file:// resources).
-  std::string idxPath = FindIndexPath();
-  fprintf(stderr, "[Geno] LoadHTML: idxPath=%s\n", idxPath.empty() ? "(empty)" : idxPath.c_str());
-  if (!idxPath.empty()) {
-    std::string uri = "file://" + idxPath;
-    fprintf(stderr, "[Geno] LoadHTML -> LOAD_URI %s\n", uri.c_str());
-    Send("LOAD_URI %s", uri.c_str());
+  // Write self-contained HTML (CSS/JS already inlined by build system)
+  // to a per-instance temp file to avoid WebKit relative-path issues and
+  // global resource conflicts between plugin instances.
+  char tmpPath[PATH_MAX];
+  snprintf(tmpPath, sizeof(tmpPath), "/tmp/geno_ui_%d_%p.html", getpid(), (void*)this);
+  FILE* f = fopen(tmpPath, "w");
+  if (f) {
+    fwrite(html, 1, strlen(html), f);
+    fclose(f);
+    fprintf(stderr, "[Geno] LoadHTML: wrote %zu bytes to %s\n", strlen(html), tmpPath);
+  } else {
+    fprintf(stderr, "[Geno] LoadHTML: cannot write temp file, sending inline\n");
+    std::string flat;
+    flat.reserve(strlen(html));
+    for (const char* p = html; *p; ++p)
+      flat.push_back(*p == '\n' ? ' ' : *p);
+    Send("LOAD_HTML %s", flat.c_str());
     Send("RESIZE %d %d", mLastW, mLastH);
     DrainEvents();
     return;
   }
 
-  // Fallback: send HTML inline (no relative resources will load)
-  std::string flat;
-  if (html) {
-    flat.reserve(strlen(html));
-    for (const char* p = html; *p; ++p)
-      flat.push_back(*p == '\n' ? ' ' : *p);
-  }
-  Send("LOAD_HTML %s", flat.c_str());
+  std::string uri = std::string("file://") + tmpPath;
+  fprintf(stderr, "[Geno] LoadHTML -> LOAD_URL %s\n", uri.c_str());
+  Send("LOAD_URL %s", uri.c_str());
   Send("RESIZE %d %d", mLastW, mLastH);
   DrainEvents();
 }

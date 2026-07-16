@@ -30,10 +30,6 @@
           <span class="badge">Target Audio</span>
         </div>
         <div class="panel-body">
-          <div class="dropzone" id="targetDropzone" ondragover="event.preventDefault()" ondrop="app.handleDrop(event, 'target')">
-            <div class="dropzone-icon">&#9835;</div>
-            <div class="dropzone-text">Drop WAV/AIFF/FLAC or use DAW input</div>
-          </div>
           <div class="analyzer-report" id="targetReport">
             <div class="analyzer-row"><span class="analyzer-label">Detected Instrument</span><span class="analyzer-value" id="targetInstrument">—</span></div>
             <div class="analyzer-row"><span class="analyzer-label">Confidence</span><span class="analyzer-value" id="targetConfidence">—</span></div>
@@ -45,8 +41,7 @@
           <div class="btn-group">
             <button class="btn btn-primary btn-small" id="recordBtn" onclick="app.toggleCapture()">● Record</button>
             <button class="btn btn-small" onclick="app.analyzeTarget()">Analyze</button>
-            <input type="file" id="audioFileInput" accept=".wav,.aiff,.aif,.flac" style="display:none" onchange="app.onAudioFileSelected(this)">
-            <button class="btn btn-small" onclick="document.getElementById('audioFileInput').click()">Load File</button>
+            <button class="btn btn-small" onclick="app.openFileDialog('target')">Load File</button>
           </div>
         </div>
       </div>
@@ -59,13 +54,9 @@
         </div>
         <div class="panel-body">
           <div class="dna-badge" id="sourceBadge">No DNA loaded</div>
-          <div class="dropzone" id="sourceDropzone" style="min-height:40px" ondragover="event.preventDefault()" ondrop="app.handleDrop(event, 'source')">
-            <div class="dropzone-text">Drop DNA file or select from library</div>
-          </div>
           <div class="btn-group">
             <button class="btn btn-small" onclick="app.toggleBrowser()">From Library</button>
-            <input type="file" id="dnaFileInput" accept=".dna,.json" style="display:none" onchange="app.onDNAFileSelected(this)">
-            <button class="btn btn-small" onclick="document.getElementById('dnaFileInput').click()">From File</button>
+            <button class="btn btn-small" onclick="app.openFileDialog('source')">From File</button>
             <button class="btn btn-small" onclick="app.analyzeSource()">Analyze Current</button>
           </div>
           <div class="dna-layers" id="dnaLayers">

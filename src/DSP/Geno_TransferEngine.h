@@ -32,13 +32,16 @@ public:
 
   GenoProfile GetCurrentSource() const { return mSourceProfile; }
   GenoProfile GetCurrentTarget() const { return mTargetProfile; }
+  bool GetSourceLoaded() const { return mSourceLoaded; }
+  bool GetTargetLoaded() const { return mTargetLoaded; }
 
 private:
   double mSampleRate = 44100.0;
   GenoTransferParams mParams;
   GenoProfile mSourceProfile;
   GenoProfile mTargetProfile;
-  bool mProfilesLoaded = false;
+  bool mSourceLoaded = false;
+  bool mTargetLoaded = false;
 
   SpectralProcessor mSpectralProc;
   DynamicsProcessor mDynamicsProc;

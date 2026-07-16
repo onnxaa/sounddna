@@ -1,6 +1,7 @@
 #include "Geno_TransferEngine.h"
 #include <cstring>
 #include <algorithm>
+#include <cmath>
 
 TransferEngine::TransferEngine() {
   Reset();
@@ -17,7 +18,8 @@ void TransferEngine::Reset() {
   mSpaceProc.Reset();
   mGlueProc.Reset();
   mResonanceProc.Reset();
-  mProfilesLoaded = false;
+  mSourceLoaded = false;
+  mTargetLoaded = false;
   mScratchL.fill(0.f);
   mScratchR.fill(0.f);
 }
@@ -38,14 +40,14 @@ void TransferEngine::SetSampleRate(double sr) {
 
 void TransferEngine::SetSourceProfile(const GenoProfile& profile) {
   mSourceProfile = profile;
-  mProfilesLoaded = true;
-  UpdateProcessors();
+  mSourceLoaded = true;
+  if (mSourceLoaded && mTargetLoaded) UpdateProcessors();
 }
 
 void TransferEngine::SetTargetProfile(const GenoProfile& profile) {
   mTargetProfile = profile;
-  mProfilesLoaded = true;
-  UpdateProcessors();
+  mTargetLoaded = true;
+  if (mSourceLoaded && mTargetLoaded) UpdateProcessors();
 }
 
 void TransferEngine::SetTransferParams(const GenoTransferParams& params) {
@@ -54,9 +56,16 @@ void TransferEngine::SetTransferParams(const GenoTransferParams& params) {
 }
 
 void TransferEngine::UpdateProcessors() {
-  if (!mProfilesLoaded) return;
+  if (!mSourceLoaded || !mTargetLoaded) {
+    fprintf(stderr, "[DBUG] TE::UpdateProcessors: SKIP (sL=%d tL=%d)\n", mSourceLoaded, mTargetLoaded);
+    return;
+  }
 
   auto amt = [&](GenoGene g) { return mParams.amounts[static_cast<int>(g)]; };
+
+  fprintf(stderr, "[DBUG] TE::UpdateProcessors: amts Tone=%.3f Dyn=%.3f Noise=%.3f Tex=%.3f Air=%.3f Res=%.3f\n",
+          amt(GenoGene::Tone), amt(GenoGene::Dynamics), amt(GenoGene::Noise),
+          amt(GenoGene::Texture), amt(GenoGene::Air), amt(GenoGene::Resonance));
 
   mSpectralProc.SetSourceProfile(mSourceProfile.spectral);
   mSpectralProc.SetTargetProfile(mTargetProfile.spectral);
@@ -124,7 +133,21 @@ template void TransferEngine::ApplyProcessor<>(ResonanceProcessor&, const GenoTr
 void TransferEngine::Process(const float* inputL, const float* inputR,
                               float* outputL, float* outputR, int numSamples,
                               bool isStereo) {
-  if (!mProfilesLoaded) {
+  {
+    static int pfc = 0;
+    if (++pfc % 500 == 0) {
+      float inPeakL = 0, inPeakR = 0;
+      for (int i = 0; i < numSamples; ++i) {
+        if (std::fabs(inputL[i]) > inPeakL) inPeakL = std::fabs(inputL[i]);
+        if (std::fabs(inputR[i]) > inPeakR) inPeakR = std::fabs(inputR[i]);
+      }
+      fprintf(stderr, "[DBUG] TE::Process: sL=%d tL=%d inPk=%.4f/%.4f %s\n",
+              mSourceLoaded, mTargetLoaded, inPeakL, inPeakR,
+              (!mSourceLoaded || !mTargetLoaded) ? "PASS" : "PROC");
+    }
+  }
+
+  if (!mSourceLoaded || !mTargetLoaded) {
     std::copy(inputL, inputL + numSamples, outputL);
     if (isStereo)
       std::copy(inputR, inputR + numSamples, outputR);
@@ -184,5 +207,26 @@ void TransferEngine::Process(const float* inputL, const float* inputR,
       outputR[pos + i] = isStereo ? mScratchR[i] : mScratchL[i];
     }
     pos += n;
+  }
+
+  {
+    static int ofc = 0;
+    if (++ofc % 500 == 0) {
+      float outPeakL = 0, outPeakR = 0;
+      for (int i = 0; i < numSamples; ++i) {
+        if (std::fabs(outputL[i]) > outPeakL) outPeakL = std::fabs(outputL[i]);
+        if (std::fabs(outputR[i]) > outPeakR) outPeakR = std::fabs(outputR[i]);
+        if (outputL[i] != outputL[i]) { fprintf(stderr, "[DBUG] TE::Process: NaN in outputL at %d\n", i); break; }
+        if (outputR[i] != outputR[i]) { fprintf(stderr, "[DBUG] TE::Process: NaN in outputR at %d\n", i); break; }
+      }
+      fprintf(stderr, "[DBUG] TE::Process: outPk=%.4f/%.4f amts=[%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f] locks=[%d,%d,%d,%d,%d,%d,%d,%d,%d]\n",
+              outPeakL, outPeakR,
+              mParams.amounts[0], mParams.amounts[1], mParams.amounts[2],
+              mParams.amounts[3], mParams.amounts[4], mParams.amounts[5],
+              mParams.amounts[6], mParams.amounts[7], mParams.amounts[8],
+              (int)mParams.locks[0], (int)mParams.locks[1], (int)mParams.locks[2],
+              (int)mParams.locks[3], (int)mParams.locks[4], (int)mParams.locks[5],
+              (int)mParams.locks[6], (int)mParams.locks[7], (int)mParams.locks[8]);
+    }
   }
 }
