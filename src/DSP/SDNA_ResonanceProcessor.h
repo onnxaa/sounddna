@@ -13,11 +13,11 @@ public:
 
 private:
   double mSampleRate = 44100.0;
-  double mTransferAmount = 1.0;
+  std::atomic<double> mTransferAmount{1.0};
   double mSmoothAmount = 1.0;
   double mRampCoef = 0.0;
   SpectralFeatures mSource, mTarget;
-  bool mProfilesLoaded = false;
+  std::atomic<bool> mProfilesLoaded{false};
 
   struct Biquad {
     double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;

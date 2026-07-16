@@ -54,7 +54,8 @@ void StereoProcessor::ProcessMidSide([[maybe_unused]] float* mid, float* side, i
   if (sourceWidth < 0.01) sourceWidth = 0.5;
   if (targetWidth < 0.01) targetWidth = 0.5;
 
-  mSmoothAmount += (mTransferAmount - mSmoothAmount) * (1.0 - mRampCoef);
+  double blockRamp = std::pow(mRampCoef, numSamples);
+  mSmoothAmount = mSmoothAmount * blockRamp + mTransferAmount * (1.0 - blockRamp);
   double widthRatio = targetWidth / sourceWidth;
   widthRatio = 1.0 + (widthRatio - 1.0) * mSmoothAmount;
 

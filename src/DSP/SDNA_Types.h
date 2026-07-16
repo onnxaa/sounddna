@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <array>
+#include <atomic>
 #include <cstdint>
 
 constexpr int kNumSpectralBands = 128;

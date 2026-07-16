@@ -49,7 +49,10 @@ DNAProfile MorphEngine::GetCurrentMorph() const {
     if (mMorphPosition >= a.position && mMorphPosition <= b.position) {
       double range = b.position - a.position;
       double t = (range > 0.0) ? (mMorphPosition - a.position) / range : 0.0;
-      return InterpolateProfiles(a.profile, b.profile, t);
+      double wA = std::max(0.001, a.blendAmount);
+      double wB = std::max(0.001, b.blendAmount);
+      double tw = t * wB / (wA * (1.0 - t) + wB * t);
+      return InterpolateProfiles(a.profile, b.profile, std::clamp(tw, 0.0, 1.0));
     }
   }
 

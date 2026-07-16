@@ -2,11 +2,12 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <utility>
 
 FFTProcessor::FFTProcessor(int fftSize, int hopSize)
-  : mFFTSize(fftSize)
-  , mHopSize(hopSize)
-  , mNumBins(fftSize / 2 + 1)
+  : mFFTSize(std::max(32, fftSize))
+  , mHopSize(std::clamp(hopSize, 1, mFFTSize))
+  , mNumBins(mFFTSize / 2 + 1)
 {
   mInputBuffer.resize(mFFTSize, 0.f);
   mOverlapBuffer.resize(mFFTSize, 0.0);
@@ -20,10 +21,57 @@ FFTProcessor::FFTProcessor(int fftSize, int hopSize)
 }
 
 FFTProcessor::~FFTProcessor() {
-  if (mForwardPlan) fftw_destroy_plan(mForwardPlan);
-  if (mInversePlan) fftw_destroy_plan(mInversePlan);
-  if (mFFTIn) fftw_free(mFFTIn);
-  if (mFFTOut) fftw_free(mFFTOut);
+  DestroyResources();
+}
+
+void FFTProcessor::DestroyResources() {
+  if (mForwardPlan) { fftw_destroy_plan(mForwardPlan); mForwardPlan = nullptr; }
+  if (mInversePlan) { fftw_destroy_plan(mInversePlan); mInversePlan = nullptr; }
+  if (mFFTIn) { fftw_free(mFFTIn); mFFTIn = nullptr; }
+  if (mFFTOut) { fftw_free(mFFTOut); mFFTOut = nullptr; }
+}
+
+FFTProcessor::FFTProcessor(FFTProcessor&& other) noexcept
+  : mFFTSize(other.mFFTSize)
+  , mHopSize(other.mHopSize)
+  , mNumBins(other.mNumBins)
+  , mSampleRate(other.mSampleRate)
+  , mInputBuffer(std::move(other.mInputBuffer))
+  , mWindow(std::move(other.mWindow))
+  , mFFTIn(other.mFFTIn)
+  , mFFTOut(other.mFFTOut)
+  , mForwardPlan(other.mForwardPlan)
+  , mInversePlan(other.mInversePlan)
+  , mOverlapBuffer(std::move(other.mOverlapBuffer))
+  , mWindowedBuffer(std::move(other.mWindowedBuffer))
+{
+  other.mFFTIn = nullptr;
+  other.mFFTOut = nullptr;
+  other.mForwardPlan = nullptr;
+  other.mInversePlan = nullptr;
+}
+
+FFTProcessor& FFTProcessor::operator=(FFTProcessor&& other) noexcept {
+  if (this != &other) {
+    DestroyResources();
+    mFFTSize = other.mFFTSize;
+    mHopSize = other.mHopSize;
+    mNumBins = other.mNumBins;
+    mSampleRate = other.mSampleRate;
+    mInputBuffer = std::move(other.mInputBuffer);
+    mWindow = std::move(other.mWindow);
+    mFFTIn = other.mFFTIn;
+    mFFTOut = other.mFFTOut;
+    mForwardPlan = other.mForwardPlan;
+    mInversePlan = other.mInversePlan;
+    mOverlapBuffer = std::move(other.mOverlapBuffer);
+    mWindowedBuffer = std::move(other.mWindowedBuffer);
+    other.mFFTIn = nullptr;
+    other.mFFTOut = nullptr;
+    other.mForwardPlan = nullptr;
+    other.mInversePlan = nullptr;
+  }
+  return *this;
 }
 
 void FFTProcessor::Reset() {
@@ -62,7 +110,7 @@ void FFTProcessor::ProcessBlock(const float* input, int numSamples) {
 }
 
 void FFTProcessor::GetMagnitudeSpectrum(std::vector<double>& mag, bool /*applyWindow*/) {
-  mag.resize(mNumBins);
+  if ((int)mag.size() != mNumBins) mag.assign(mNumBins, 0.0);
   double norm = 1.0 / mFFTSize;
   for (int i = 0; i < mNumBins; ++i) {
     double re = mFFTOut[i][0] * norm;
@@ -72,7 +120,7 @@ void FFTProcessor::GetMagnitudeSpectrum(std::vector<double>& mag, bool /*applyWi
 }
 
 void FFTProcessor::GetPhaseSpectrum(std::vector<double>& phase) {
-  phase.resize(mNumBins);
+  if ((int)phase.size() != mNumBins) phase.assign(mNumBins, 0.0);
   for (int i = 0; i < mNumBins; ++i) {
     phase[i] = std::atan2(mFFTOut[i][1], mFFTOut[i][0]);
   }

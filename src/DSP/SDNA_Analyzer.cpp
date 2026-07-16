@@ -31,11 +31,15 @@ void DNAAnalyzer::ComputeFullAnalysis(const float* audioL, const float* audioR,
                                        int numSamples, bool isStereo,
                                        DNAProfile& out) {
   if (numSamples < kMinAnalysisSamples) return;
+  double rms = 0.0;
+  for (int i = 0; i < numSamples; ++i) rms += (double)audioL[i] * audioL[i];
+  rms = std::sqrt(rms / numSamples);
+
   AnalyzeSpectral(audioL, numSamples, out.spectral);
   AnalyzeDynamics(audioL, numSamples, out.dynamics);
   if (isStereo) AnalyzeStereo(audioL, audioR, numSamples, out.stereo);
   AnalyzeNoise(audioL, numSamples, out.noise);
-  AnalyzeTexture(audioL, numSamples, out.texture);
+  AnalyzeTexture(audioL, numSamples, rms, out.spectral.pitch, out.texture);
   AnalyzeSpace(audioL, numSamples, out.space);
   AnalyzeMovement(audioL, numSamples, out.movement);
 }
@@ -60,8 +64,18 @@ void DNAAnalyzer::AnalyzeSpectral(const float* audio, int numSamples,
   double invFrames = 1.0 / numFrames;
   for (auto& v : accumMag) v *= invFrames;
 
+  out.pitch = ComputePitchAutocorrelation(audio, numSamples);
+
+  double fundamentalBin = 0.0;
+  if (out.pitch > 0.0) {
+    fundamentalBin = out.pitch * mFFT.GetFFTSize() / mSampleRate;
+  } else {
+    int maxIdx = (int)(std::max_element(accumMag.begin() + 1, accumMag.end()) - accumMag.begin());
+    if (maxIdx < (int)accumMag.size()) fundamentalBin = (double)maxIdx;
+  }
+
   mFFT.MagnitudeToEnvelope(accumMag, out.spectralEnvelope, kNumSpectralBands);
-  AnalyzeHarmonics(accumMag, out.harmonicProfile);
+  AnalyzeHarmonics(accumMag, fundamentalBin, out.harmonicProfile);
   out.centroid = ComputeSpectralCentroid(accumMag);
   out.spread = ComputeSpectralSpread(accumMag, out.centroid);
   out.rolloff = ComputeSpectralRolloff(accumMag);
@@ -77,7 +91,6 @@ void DNAAnalyzer::AnalyzeSpectral(const float* audio, int numSamples,
   }
   out.brightness = (totalSum > 0.0) ? brightSum / totalSum : 0.0;
 
-  out.pitch = ComputePitchAutocorrelation(audio, numSamples);
   out.pitchConfidence = (out.pitch > 0.0) ?
     std::min(1.0, (1.0 - out.spectralFlatness) * 1.5) : 0.0;
 }
@@ -120,17 +133,11 @@ double DNAAnalyzer::ComputePitchAutocorrelation(const float* audio, int numSampl
 }
 
 void DNAAnalyzer::AnalyzeHarmonics(const std::vector<double>& mag,
+                                    double fundamentalBin,
                                     std::vector<double>& harmonicProfile) {
   harmonicProfile.resize(kNumHarmonics, 0.0);
-  if (mag.empty()) return;
+  if (mag.empty() || fundamentalBin < 1.0) return;
   int numBins = (int)mag.size();
-  double maxMag = 0.0;
-  int maxIdx = 0;
-  for (int i = 1; i < numBins; ++i) {
-    if (mag[i] > maxMag) { maxMag = mag[i]; maxIdx = i; }
-  }
-  if (maxIdx < 1) return;
-  double fundamentalBin = (double)maxIdx;
 
   for (int h = 0; h < kNumHarmonics; ++h) {
     int binIdx = (int)std::round(fundamentalBin * (h + 1));
@@ -167,7 +174,9 @@ void DNAAnalyzer::AnalyzeDynamics(const float* audio, int numSamples,
     env = coef * env + (1.0 - coef) * absIn;
     envelope[i] = env;
   }
-  out.envelopeMean = env;
+  double envMean = 0.0;
+  for (int i = 0; i < numSamples; ++i) envMean += envelope[i];
+  out.envelopeMean = envMean / numSamples;
 
   double attackMs = 0.0, releaseMs = 0.0;
   double peakEnv = *std::max_element(envelope.begin(), envelope.end());
@@ -189,16 +198,20 @@ void DNAAnalyzer::AnalyzeDynamics(const float* audio, int numSamples,
   out.attackMs = attackMs;
   out.releaseMs = releaseMs;
 
-  double compSum = 0.0;
-  int compCount = 0;
-  double compThreshold = rms * 0.5;
-  for (int i = 0; i < numSamples; ++i) {
-    if (envelope[i] > compThreshold) {
-      compSum += envelope[i] / compThreshold;
-      compCount++;
-    }
+  // Estimate compression ratio from envelope dB range compression
+  // Ratio = (peak_dB - noiseFloor_dB) / (peak_dB - avgEnvelope_dB)
+  // Higher ratio = more compressed (envelope stays near peak)
+  double envDb = (out.envelopeMean > 1e-10) ? 20.0 * std::log10(out.envelopeMean) : -60.0;
+  double peakDb = (peakVal > 1e-10) ? 20.0 * std::log10(peakVal) : -60.0;
+  double noiseDb = -60.0;
+  if (peakDb - noiseDb > 6.0) {
+    double inputRange = peakDb - noiseDb;
+    double outputRange = peakDb - envDb;
+    out.compressionRatio = (outputRange > 1.0) ?
+      std::clamp(inputRange / outputRange, 1.0, 20.0) : 20.0;
+  } else {
+    out.compressionRatio = 1.0;
   }
-  out.compressionRatio = (compCount > 0) ? compSum / compCount : 1.0;
 }
 
 void DNAAnalyzer::AnalyzeStereo(const float* audioL, const float* audioR,
@@ -228,15 +241,34 @@ void DNAAnalyzer::AnalyzeStereo(const float* audioL, const float* audioR,
   out.balance = (sumR2 + sumL2 > 0.0) ?
     (sumR2 - sumL2) / (sumR2 + sumL2) : 0.0;
 
-  double phaseSum = 0.0;
-  int phaseCount = 0;
-  for (int i = 1; i < numSamples; ++i) {
-    double phL = std::atan2(audioL[i], audioL[i - 1]);
-    double phR = std::atan2(audioR[i], audioR[i - 1]);
-    phaseSum += std::abs(phL - phR);
-    phaseCount++;
+  // Phase drift: average inter-channel phase difference from FFT cross-spectrum
+  out.phaseDrift = 0.0;
+  int numFrames = 0;
+  for (int f = 0; f * kFFTHop + kFFTSize <= numSamples; ++f) {
+    int offset = f * kFFTHop;
+    mFFT.ProcessBlock(audioL + offset, kFFTHop);
+    std::vector<double> magL, phaseL;
+    mFFT.GetMagnitudeSpectrum(magL);
+    mFFT.GetPhaseSpectrum(phaseL);
+
+    mFFT.ProcessBlock(audioR + offset, kFFTHop);
+    std::vector<double> magR, phaseR;
+    mFFT.GetMagnitudeSpectrum(magR);
+    mFFT.GetPhaseSpectrum(phaseR);
+
+    double weightedSum = 0.0, weightSum = 0.0;
+    for (int i = 1; i < std::min({(int)magL.size(), (int)magR.size(), (int)phaseL.size(), (int)phaseR.size()}); ++i) {
+      double w = magL[i] + magR[i];
+      double phaseDiff = std::abs(phaseL[i] - phaseR[i]);
+      if (phaseDiff > M_PI) phaseDiff = 2.0 * M_PI - phaseDiff;
+      weightedSum += w * phaseDiff;
+      weightSum += w;
+    }
+    if (weightSum > 0.0)
+      out.phaseDrift += weightedSum / weightSum;
+    numFrames++;
   }
-  out.phaseDrift = (phaseCount > 0) ? phaseSum / phaseCount : 0.0;
+  if (numFrames > 0) out.phaseDrift /= numFrames;
 }
 
 void DNAAnalyzer::AnalyzeNoise(const float* audio, int numSamples,
@@ -319,17 +351,19 @@ void DNAAnalyzer::AnalyzeNoise(const float* audio, int numSamples,
 }
 
 void DNAAnalyzer::AnalyzeTexture(const float* audio, int numSamples,
+                                  double rms, double pitch,
                                   TextureFeatures& out) {
   double oddHarmonics = 0.0, evenHarmonics = 0.0;
   std::vector<double> mag;
   int numFrames = std::max(1, numSamples / kFFTHop);
+  double fundFreq = (pitch > 0.0) ? pitch : 200.0;
   for (int f = 0; f < numFrames; ++f) {
     int offset = f * kFFTHop;
     if (numSamples - offset < kFFTSize) break;
     mFFT.ProcessBlock(audio + offset, kFFTHop);
     mFFT.GetMagnitudeSpectrum(mag);
     for (int h = 1; h <= 16; ++h) {
-      int bin = (int)(h * 100.0 * mFFT.GetFFTSize() / mSampleRate);
+      int bin = (int)(h * fundFreq * mFFT.GetFFTSize() / mSampleRate);
       if (bin < (int)mag.size() && bin > 0) {
         if (h % 2 == 0) evenHarmonics += mag[bin];
         else oddHarmonics += mag[bin];
@@ -340,10 +374,12 @@ void DNAAnalyzer::AnalyzeTexture(const float* audio, int numSamples,
   out.harmonicDistortion = (total > 0.0) ? evenHarmonics / total : 0.0;
   out.saturationAmount = (total > 0.0) ? oddHarmonics / total : 0.0;
 
+  // Adaptive transient threshold relative to RMS
+  double transientThreshold = std::max(0.01, rms * 2.0);
   double transientEnergy = 0.0, steadyEnergy = 0.0;
   for (int i = 1; i < numSamples; ++i) {
     double diff = std::abs((double)audio[i] - audio[i - 1]);
-    if (diff > 0.1) transientEnergy += diff * diff;
+    if (diff > transientThreshold) transientEnergy += diff * diff;
     else steadyEnergy += (double)audio[i] * audio[i];
   }
   out.transientShape = (transientEnergy + steadyEnergy > 0.0) ?
@@ -352,7 +388,6 @@ void DNAAnalyzer::AnalyzeTexture(const float* audio, int numSamples,
 
 void DNAAnalyzer::AnalyzeSpace(const float* audio, int numSamples,
                                 SpaceFeatures& out) {
-  double decayEstimate = 0.0;
   double env = 0.0;
   double attackCoef = std::exp(-1.0 / (0.001 * mSampleRate));
   double releaseCoef = std::exp(-1.0 / (0.200 * mSampleRate));
@@ -365,17 +400,36 @@ void DNAAnalyzer::AnalyzeSpace(const float* audio, int numSamples,
   }
   int peakIdx = (int)(std::max_element(envelope.begin(), envelope.end()) - envelope.begin());
   double peakVal = envelope[peakIdx];
-  if (peakVal > 0.001) {
-    double halfVal = peakVal * 0.5;
-    int halfIdx = peakIdx;
-    for (int i = peakIdx; i < numSamples; ++i) {
-      if (envelope[i] <= halfVal) { halfIdx = i; break; }
+
+  // RT60 from linear regression on log envelope after peak
+  if (peakVal > 0.001 && peakIdx < numSamples - 10) {
+    std::vector<double> logEnv;
+    double sumX = 0.0, sumY = 0.0, sumXY = 0.0, sumX2 = 0.0;
+    int n = 0;
+    double noiseFloor = peakVal * 0.01;
+    for (int i = peakIdx; i < numSamples && envelope[i] > noiseFloor; ++i, ++n) {
+      double x = (double)(i - peakIdx) / mSampleRate;
+      double y = std::log(envelope[i] / peakVal + 1e-30);
+      sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x;
     }
-    decayEstimate = (halfIdx - peakIdx) / mSampleRate * 1000.0;
+    if (n > 5) {
+      double denom = n * sumX2 - sumX * sumX;
+      if (std::abs(denom) < 1e-30) denom = 1e-30;
+      double slope = (n * sumXY - sumX * sumY) / denom;
+      if (slope < 0.0) {
+        out.decayTime = std::clamp(-6.9078 / slope * 1000.0, 0.0, 10000.0);
+      } else {
+        out.decayTime = 0.0;
+      }
+    } else {
+      out.decayTime = 0.0;
+    }
+  } else {
+    out.decayTime = 0.0;
   }
-  out.decayTime = std::clamp(decayEstimate * 4.0, 0.0, 10000.0);
-  out.earlyReflections = (decayEstimate > 0.0) ?
-    std::min(1.0, decayEstimate / 100.0) : 0.0;
+
+  out.earlyReflections = (peakVal > 0.001 && numSamples > 100) ?
+    std::min(1.0, (double)peakIdx / (numSamples * 0.2)) : 0.0;
 }
 
 void DNAAnalyzer::AnalyzeMovement(const float* audio, int numSamples,
@@ -391,24 +445,29 @@ void DNAAnalyzer::AnalyzeMovement(const float* audio, int numSamples,
     envelope[i] = env;
   }
 
+  double envMean = 0.0;
+  for (int i = 0; i < numSamples; ++i) envMean += envelope[i];
+  envMean /= numSamples;
+
+  // Zero-crossings of mean-subtracted envelope → actual modulation rate
   double zeroCrossings = 0;
   for (int i = 1; i < numSamples; ++i) {
-    if (envelope[i] * envelope[i - 1] <= 0.0)
+    double e0 = envelope[i] - envMean;
+    double e1 = envelope[i - 1] - envMean;
+    if (e0 * e1 <= 0.0 && (e0 != 0.0 || e1 != 0.0))
       zeroCrossings++;
   }
   double envFreq = zeroCrossings * mSampleRate / (2.0 * numSamples);
   out.modulationRate = envFreq;
 
-  double envVar = 0.0, envMean = 0.0;
-  for (int i = 0; i < numSamples; ++i) envMean += envelope[i];
-  envMean /= numSamples;
+  double envVar = 0.0;
   for (int i = 0; i < numSamples; ++i)
     envVar += (envelope[i] - envMean) * (envelope[i] - envMean);
   envVar = std::sqrt(envVar / numSamples);
   out.modulationDepth = (envMean > 0.0) ? std::min(2.0, envVar / envMean) : 0.0;
 
-  out.tremoloAmount = out.modulationDepth * 0.5;
-  out.vibratoAmount = out.modulationDepth * 0.2;
+  out.tremoloAmount = (envFreq < 10.0) ? out.modulationDepth : 0.0;
+  out.vibratoAmount = (envFreq >= 10.0) ? out.modulationDepth : 0.0;
   out.wobbleRate = envFreq * 0.3;
 }
 
@@ -455,9 +514,10 @@ double DNAAnalyzer::ComputeSpectralFlatness(const std::vector<double>& mag) {
   double geomMean = 0.0, arithMean = 0.0;
   int count = 0;
   for (auto& m : mag) {
-    if (m > 1e-10) {
-      geomMean += std::log(m);
-      arithMean += m;
+    double p = m * m;
+    if (p > 1e-20) {
+      geomMean += std::log(p);
+      arithMean += p;
       count++;
     }
   }

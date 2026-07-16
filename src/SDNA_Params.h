@@ -55,7 +55,11 @@ enum EMsgTags {
   kMsgTagRedo,
   kMsgTagRequestParameters,
   kMsgTagSendDNAProfile,
-  kMsgTagSendAnalyzerReport
+  kMsgTagSendAnalyzerReport,
+  kMsgTagLoadAudioFile,
+  kMsgTagLoadDNAFile,
+  kMsgTagAnalyzeCapture,
+  kMsgTagCaptureStatus
 };
 
 static const char* kGeneNames[] = {

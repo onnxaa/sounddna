@@ -10,8 +10,9 @@ END_IPLUG_NAMESPACE
 #include "DSP/SDNA_MorphEngine.h"
 #include "DSP/SDNA_Analyzer.h"
 #include <vector>
-#include <deque>
 #include <string>
+#include <atomic>
+#include <mutex>
 
 using namespace iplug;
 
@@ -26,6 +27,7 @@ public:
 
   bool OnMessage(int msgTag, int ctrlTag, int dataSize, const void* pData) override;
   void OnParamChange(int paramIdx) override;
+  void OnIdle() override;
 
 #ifdef WEBVIEW_EDITOR_DELEGATE
   bool CanNavigateToURL(const char* url);
@@ -49,16 +51,27 @@ private:
   bool mBypass = false;
   double mSampleRate = 44100.0;
 
-  struct AnalysisBuffer {
-    std::deque<float> bufferL;
-    std::deque<float> bufferR;
-    static constexpr int kMaxBufferSize = 44100 * 5; // 5 seconds
-  } mAnalysisBuf;
+  // Circular buffer for audio capture
+  static constexpr int kMaxBufferSamples = 44100 * 5; // 5 seconds
+  std::vector<float> mCircBufL{kMaxBufferSamples, 0.f};
+  std::vector<float> mCircBufR{kMaxBufferSamples, 0.f};
+  std::atomic<int> mCircWritePos{0};
+  std::atomic<int> mCircAvail{0};
+  std::atomic<bool> mCapturing{false};
 
+  // Async analysis
+  std::mutex mAnalysisMutex;
+  std::atomic<bool> mAnalysisPending{false};
+  DNAProfile mPendingProfile;
+  int mPendingTag = 0; // 0=source, 1=target
+
+  void RunAnalysis(int numSamples, bool isStereo, DNAProfile& out);
+  bool ValidateBufferEnergy(const float* audio, int numSamples);
   void ProcessMorph();
   void UpdateProcessors();
   void PushHistory(const DNAProfile& profile);
   void SendAnalyzerReportToUI(const DNAProfile& profile);
   void SendDNAProfileToUI(const DNAProfile& profile, const char* type);
   void SendParametersToUI();
+  void SendCaptureStatus();
 };

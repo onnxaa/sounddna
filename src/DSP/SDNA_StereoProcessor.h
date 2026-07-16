@@ -18,11 +18,11 @@ public:
 
 private:
   double mSampleRate = 44100.0;
-  double mTransferAmount = 1.0;
+  std::atomic<double> mTransferAmount{1.0};
   double mSmoothAmount = 1.0;
   double mRampCoef = 0.0;
   StereoFeatures mSource, mTarget;
-  bool mProfilesLoaded = false;
+  std::atomic<bool> mProfilesLoaded{false};
 
   std::array<float, kMaxBlockSize> mMidBuf;
   std::array<float, kMaxBlockSize> mSideBuf;

@@ -22,7 +22,6 @@ void SpectralProcessor::Reset() {
   std::fill(mPrevPhase.begin(), mPrevPhase.end(), 0.0);
   std::fill(mPrevMag.begin(), mPrevMag.end(), 0.0);
   std::fill(mPrevMag2.begin(), mPrevMag2.end(), 0.0);
-  mPhaseIndex = 0;
   mSmoothAmount = mTransferAmount;
 }
 
@@ -122,7 +121,14 @@ void SpectralProcessor::Process(const float* input, float* output, int numSample
     return;
   }
 
-  mSmoothAmount += (mTransferAmount - mSmoothAmount) * (1.0 - mRampCoef);
+  double blockRamp = std::pow(mRampCoef, numSamples);
+  mSmoothAmount = mSmoothAmount * blockRamp + mTransferAmount * (1.0 - blockRamp);
+
+  if (mSmoothAmount < 0.001) {
+    std::copy(input, input + numSamples, output);
+    return;
+  }
+
   for (size_t j = 0; j < mCurrentFilter.size(); ++j)
     mCurrentFilter[j] = 1.0 + (mSpectralFilter[j] - 1.0) * mSmoothAmount;
 
@@ -145,14 +151,14 @@ void SpectralProcessor::Process(const float* input, float* output, int numSample
       mFFT.ApplySpectralFilter(mCurrentFilter, mMagBuf);
 
       for (size_t j = 0; j < mPhaseBuf.size() && j < mPrevPhase.size(); ++j) {
+        double measured = mPhaseBuf[j];
         double phaseBlend = 0.5 + transient * 0.4;
-        mPhaseBuf[j] = mPrevPhase[j] + (mPhaseBuf[j] - mPrevPhase[j]) * phaseBlend;
-        mPrevPhase[j] = mPhaseBuf[j];
+        mPhaseBuf[j] = mPrevPhase[j] + (measured - mPrevPhase[j]) * phaseBlend;
+        mPrevPhase[j] = measured;
       }
 
-      std::copy(mMagBuf.begin(), mMagBuf.end(), mPrevMag2.begin());
-      std::copy(mPrevMag.begin(), mPrevMag.end(), mPrevMag2.begin());
-      std::copy(mMagBuf.begin(), mMagBuf.end(), mPrevMag.begin());
+    std::copy(mPrevMag.begin(), mPrevMag.end(), mPrevMag2.begin());
+    std::copy(mMagBuf.begin(), mMagBuf.end(), mPrevMag.begin());
 
       mFFT.SynthesizeFromSpectrum(mMagBuf, mPhaseBuf, mTempBlockBuf.data(), blockSize);
 
@@ -162,7 +168,6 @@ void SpectralProcessor::Process(const float* input, float* output, int numSample
         float blend = (transient * mTransientBlend);
         output[pos + i + j] = dry * blend + wet * (1.0f - blend);
       }
-      mPhaseIndex++;
     }
     pos += chunk;
   }

@@ -42,7 +42,10 @@
             <div class="analyzer-row"><span class="analyzer-label">Noise</span><span class="analyzer-value" id="targetNoise">—</span></div>
           </div>
           <div class="btn-group">
-            <button class="btn btn-primary btn-small" onclick="SAMFUI(0)">Analyze Target</button>
+            <button class="btn btn-primary btn-small" id="recordBtn" onclick="app.toggleCapture()">● Record</button>
+            <button class="btn btn-small" onclick="app.analyzeTarget()">Analyze</button>
+            <input type="file" id="audioFileInput" accept=".wav,.aiff,.aif,.flac" style="display:none" onchange="app.onAudioFileSelected(this)">
+            <button class="btn btn-small" onclick="document.getElementById('audioFileInput').click()">Load File</button>
           </div>
         </div>
       </div>
@@ -59,9 +62,10 @@
             <div class="dropzone-text">Drop DNA file or select from library</div>
           </div>
           <div class="btn-group">
-            <button class="btn btn-small" onclick="SAMFUI(1)">From Library</button>
-            <button class="btn btn-small" onclick="SAMFUI(2)">From File</button>
-            <button class="btn btn-small" onclick="SAMFUI(3)">Analyze Current</button>
+            <button class="btn btn-small" onclick="app.toggleBrowser()">From Library</button>
+            <input type="file" id="dnaFileInput" accept=".dna,.json" style="display:none" onchange="app.onDNAFileSelected(this)">
+            <button class="btn btn-small" onclick="document.getElementById('dnaFileInput').click()">From File</button>
+            <button class="btn btn-small" onclick="app.analyzeSource()">Analyze Current</button>
           </div>
           <div class="dna-layers" id="dnaLayers">
             <div class="dna-layer"><div class="dna-layer-color" style="background:var(--accent)"></div><span class="dna-layer-name">Default</span><span class="dna-layer-pct">100%</span></div>

@@ -74,7 +74,14 @@ void DynamicsProcessor::Process(const float* input, float* output, int numSample
     return;
   }
 
-  mSmoothAmount += (mTransferAmount - mSmoothAmount) * (1.0 - mRampCoef);
+  double blockRamp = std::pow(mRampCoef, numSamples);
+  mSmoothAmount = mSmoothAmount * blockRamp + mTransferAmount * (1.0 - blockRamp);
+
+  if (mSmoothAmount < 0.001) {
+    std::copy(input, input + numSamples, output);
+    return;
+  }
+
   double sourceDR = std::max(mSource.dynamicRange, 1.0);
   double targetDR = std::max(mTarget.dynamicRange, 1.0);
   double rangeRatio = targetDR / sourceDR;

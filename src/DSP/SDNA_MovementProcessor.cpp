@@ -27,12 +27,20 @@ void MovementProcessor::Process(const float* inputL, const float* inputR,
     return;
   }
 
-  mSmoothAmount += (mTransferAmount - mSmoothAmount) * (1.0 - mRampCoef);
+  double blockRamp = std::pow(mRampCoef, numSamples);
+  mSmoothAmount = mSmoothAmount * blockRamp + mTransferAmount * (1.0 - blockRamp);
   double rate = 1.0 + (mTarget.modulationRate - mSource.modulationRate) * mSmoothAmount;
   rate = std::max(0.1, rate);
   double depth = 1.0 + (mTarget.modulationDepth - mSource.modulationDepth) * mSmoothAmount;
   depth = std::clamp(depth, 0.0, 2.0);
   double tremolo = mTarget.tremoloAmount * mSmoothAmount;
+
+  bool bypass = mSmoothAmount < 0.001;
+  if (bypass) {
+    std::copy(inputL, inputL + numSamples, outputL);
+    std::copy(inputR, inputR + numSamples, outputR);
+    return;
+  }
 
   double phaseInc = rate / mSampleRate;
   for (int i = 0; i < numSamples; ++i) {
@@ -41,15 +49,15 @@ void MovementProcessor::Process(const float* inputL, const float* inputR,
     double lfo = std::sin(mPhase * 2.0 * M_PI);
     double mod = 1.0 + lfo * depth * 0.2;
     double trem = 1.0 - (lfo * 0.5 + 0.5) * tremolo * 0.5;
-    outputL[i] = inputL[i] * (float)(mod * trem);
-    outputR[i] = inputR[i] * (float)(mod * trem);
+    outputL[i] = std::clamp(inputL[i] * (float)(mod * trem), -1.0f, 1.0f);
+    outputR[i] = std::clamp(inputR[i] * (float)(mod * trem), -1.0f, 1.0f);
 
     double chorus = lfo * depth * 0.05;
     double delayedL = mDelayL;
     double delayedR = mDelayR;
     mDelayL = outputL[i];
     mDelayR = outputR[i];
-    outputL[i] = (float)(outputL[i] * 0.7 + delayedL * 0.3 * (1.0 + chorus));
-    outputR[i] = (float)(outputR[i] * 0.7 + delayedR * 0.3 * (1.0 - chorus));
+    outputL[i] = std::clamp((float)(outputL[i] * 0.7 + delayedL * 0.3 * (1.0 + chorus)), -1.0f, 1.0f);
+    outputR[i] = std::clamp((float)(outputR[i] * 0.7 + delayedR * 0.3 * (1.0 - chorus)), -1.0f, 1.0f);
   }
 }

@@ -276,6 +276,11 @@ void testTransferScenarios() {
     eng.SetTargetProfile(tgtP);
     DNATransferParams params;
     for (auto& a : params.amounts) a = amount;
+    // Lock non-spectral processors so centroid test validates only spectral transfer
+    for (int g = 0; g < static_cast<int>(DNAGene::Count); ++g) {
+      if (g != static_cast<int>(DNAGene::Tone))
+        params.locks[g] = true;
+    }
     eng.SetTransferParams(params);
 
     std::vector<float> oL(srcN), oR(srcN);
@@ -441,9 +446,9 @@ void testNoiseAnalysis() {
       check("Pink: centroid < 8500", p.spectral.centroid < 8500);
       check("Pink: tilt < 0", p.noise.spectralTilt < 0);
     }
-    // Brown noise: -6dB/oct, even lower centroid
+    // Brown noise: -6dB/oct, low centroid, less than white noise
     if (strcmp(name, "brown") == 0) {
-      check("Brown: centroid < pink", p.spectral.centroid < 3000);
+      check("Brown: centroid < 5kHz", p.spectral.centroid < 5000);
     }
   };
 

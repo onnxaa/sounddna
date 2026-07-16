@@ -15,9 +15,15 @@ vpath %.h ../src/DSP ../src
 
 .PHONY: all clean
 
-all: test_dsp
+all: test_dsp test_edge test_deep
 
 test_dsp: $(OBJS) test_dsp.o
+	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
+
+test_edge: $(OBJS) test_edge.o
+	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
+
+test_deep: $(OBJS) test_deep.o
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
 
 %.o: %.cpp
@@ -26,5 +32,11 @@ test_dsp: $(OBJS) test_dsp.o
 test_dsp.o: test_dsp.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+test_edge.o: test_edge.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+test_deep.o: test_deep.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 clean:
-	rm -f *.o test_dsp
+	rm -f *.o test_dsp test_edge test_deep

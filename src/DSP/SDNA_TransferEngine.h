@@ -32,8 +32,6 @@ public:
 
   DNAProfile GetCurrentSource() const { return mSourceProfile; }
   DNAProfile GetCurrentTarget() const { return mTargetProfile; }
-  void AnalyzeInput(const float* inputL, const float* inputR,
-                    int numSamples, bool isStereo, DNAProfile& out);
 
 private:
   double mSampleRate = 44100.0;

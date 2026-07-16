@@ -295,6 +295,8 @@ html, body {
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-small { padding: 3px 8px; font-size: 10px; }
 .btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.btn.recording { background: var(--danger); border-color: var(--danger); color: white; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
 
 .output-controls {
   display: flex;

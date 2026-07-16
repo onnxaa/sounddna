@@ -51,6 +51,14 @@ void ResonanceProcessor::Process(const float* input, float* output, int numSampl
     return 1.0;
   };
 
+  double blockRamp = std::pow(mRampCoef, numSamples);
+  mSmoothAmount = mSmoothAmount * blockRamp + mTransferAmount * (1.0 - blockRamp);
+
+  if (mSmoothAmount < 0.001) {
+    std::copy(input, input + numSamples, output);
+    return;
+  }
+
   for (int i = 0; i < 6; ++i) {
     int band = std::min(i, 5);
     double srcVal = getEnvValue(mSource, band);
@@ -58,7 +66,6 @@ void ResonanceProcessor::Process(const float* input, float* output, int numSampl
     double ratio = (srcVal > 1e-10) ? tgtVal / srcVal : 1.0;
     ratio = std::clamp(ratio, 0.1, 10.0);
     double freqMod = std::log2(ratio) * 200.0;
-  mSmoothAmount += (mTransferAmount - mSmoothAmount) * (1.0 - mRampCoef);
     double modFreq = freqs[i] + freqMod * mSmoothAmount;
     modFreq = std::clamp(modFreq, 20.0, mSampleRate * 0.45);
     double Q = 2.0 + std::abs(std::log2(ratio)) * 3.0;

@@ -124,13 +124,49 @@ SDNA.utils = {
     '#6c5ce7', '#00cec9', '#fdcb6e', '#ff7675',
     '#74b9ff', '#a29bfe', '#55efc4', '#ff9ff3',
     '#feca57', '#ff6348', '#7bed9f', '#70a1ff',
-    '#5352ed'
+    '#5352ed', '#e17055'
   ],
 
   geneNames: [
     'Tone', 'Dynamics', 'Noise', 'Space',
     'Movement', 'Stereo', 'Texture', 'Punch',
-    'Body', 'Resonance', 'Warmth', 'Sparkle', 'Glue'
+    'Body', 'Resonance', 'Warmth', 'Sparkle', 'Glue', 'Air'
+  ],
+
+  // Maps EParams (C++) to DNAGene index
+  // param 3..16 are amounts, but EParams order differs from DNAGene order
+  paramToGene: [
+    0,  // param 3 = kToneAmount → DNAGene::Tone
+    1,  // param 4 = kDynamicsAmount → DNAGene::Dynamics
+    2,  // param 5 = kNoiseAmount → DNAGene::Noise
+    5,  // param 6 = kStereoSpatialAmount → DNAGene::Stereo
+    13, // param 7 = kAirAmount → DNAGene::Air
+    4,  // param 8 = kMovementAmount → DNAGene::Movement
+    3,  // param 9 = kSpaceAmount → DNAGene::Space
+    6,  // param 10 = kTextureAmount → DNAGene::Texture
+    7,  // param 11 = kPunchAmount → DNAGene::Punch
+    8,  // param 12 = kBodyAmount → DNAGene::Body
+    9,  // param 13 = kResonanceAmount → DNAGene::Resonance
+    10, // param 14 = kWarmthAmount → DNAGene::Warmth
+    11, // param 15 = kSparkleAmount → DNAGene::Sparkle
+    12, // param 16 = kGlueAmount → DNAGene::Glue
+  ],
+
+  geneToParam: [
+    3,  // DNAGene::Tone (0) → kToneAmount
+    4,  // DNAGene::Dynamics (1) → kDynamicsAmount
+    5,  // DNAGene::Noise (2) → kNoiseAmount
+    9,  // DNAGene::Space (3) → kSpaceAmount
+    8,  // DNAGene::Movement (4) → kMovementAmount
+    6,  // DNAGene::Stereo (5) → kStereoSpatialAmount
+    10, // DNAGene::Texture (6) → kTextureAmount
+    11, // DNAGene::Punch (7) → kPunchAmount
+    12, // DNAGene::Body (8) → kBodyAmount
+    13, // DNAGene::Resonance (9) → kResonanceAmount
+    14, // DNAGene::Warmth (10) → kWarmthAmount
+    15, // DNAGene::Sparkle (11) → kSparkleAmount
+    16, // DNAGene::Glue (12) → kGlueAmount
+    7,  // DNAGene::Air (13) → kAirAmount
   ]
 };
 
@@ -148,7 +184,7 @@ SDNA.Bridge = {
   },
 
   requestParameters: () => {
-    SDNA.Bridge.sendMessage(12, '');
+    SDNA.Bridge.sendMessage(13, '');
   },
 
   analyzeSource: () => {

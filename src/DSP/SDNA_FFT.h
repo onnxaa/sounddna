@@ -8,6 +8,10 @@ class FFTProcessor {
 public:
   FFTProcessor(int fftSize = kFFTSize, int hopSize = kFFTHop);
   ~FFTProcessor();
+  FFTProcessor(const FFTProcessor&) = delete;
+  FFTProcessor& operator=(const FFTProcessor&) = delete;
+  FFTProcessor(FFTProcessor&& other) noexcept;
+  FFTProcessor& operator=(FFTProcessor&& other) noexcept;
 
   void Reset();
   void SetSampleRate(double sr);
@@ -45,4 +49,5 @@ private:
   void BuildWindow();
   void EnsureWindowedBuffer();
   void ApplyWindowToBuffer(double* buf);
+  void DestroyResources();
 };

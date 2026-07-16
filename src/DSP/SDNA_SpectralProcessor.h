@@ -17,7 +17,7 @@ public:
 
 private:
   double mSampleRate = 44100.0;
-  double mTransferAmount = 1.0;
+  std::atomic<double> mTransferAmount{1.0};
   double mSmoothAmount = 1.0;
   double mRampCoef = 0.0;
   double mTransientBlend = 0.5;
@@ -34,8 +34,7 @@ private:
   std::vector<double> mPhaseBuf;
   std::array<float, kMaxBlockSize> mDryBuf;
   std::array<float, kMaxBlockSize> mTempBlockBuf;
-  int mPhaseIndex = 0;
-  bool mProfilesLoaded = false;
+  std::atomic<bool> mProfilesLoaded{false};
 
   void RecomputeFilter();
   void MatchEnvelopes(const std::vector<double>& sourceEnv,

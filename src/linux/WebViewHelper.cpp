@@ -138,68 +138,26 @@ static gboolean x11_close_poll(gpointer data) {
 }
 
 /* ---- GTK-level file drop handling ---- */
-// Reads a file, base64-encodes it, and injects into page JS so app.loadAudioFile / loadDNAFile work.
+// Only passes the file path to JS. C++ loads the actual file.
 static void handle_file_drop(const char* path, int x, int y) {
   if (!g_state || !g_state->webview) return;
-  FILE* f = fopen(path, "rb");
-  if (!f) { fprintf(stderr, "[WvH] drop: cannot open %s\n", path); return; }
-  fseek(f, 0, SEEK_END);
-  long sz = ftell(f);
-  rewind(f);
-  // Read up to 64 MB
-  if (sz < 0 || sz > 64LL * 1024 * 1024) { fclose(f); return; }
-  auto* buf = (unsigned char*)malloc(sz);
-  if (!buf) { fclose(f); return; }
-  size_t got = fread(buf, 1, sz, f);
-  fclose(f);
-  if (got == 0) { free(buf); return; }
 
-  // Base64 encode
-  static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  size_t b64len = 4 * ((got + 2) / 3);
-  auto* b64out = (char*)malloc(b64len + 1);
-  if (!b64out) { free(buf); return; }
-  size_t j = 0;
-  for (size_t i = 0; i < got; i += 3) {
-    unsigned a = buf[i], b = i+1 < got ? buf[i+1] : 0, c = i+2 < got ? buf[i+2] : 0;
-    unsigned v = (a << 16) | (b << 8) | c;
-    b64out[j++] = b64[(v >> 18) & 0x3f];
-    b64out[j++] = b64[(v >> 12) & 0x3f];
-    b64out[j++] = i+1 < got ? b64[(v >> 6) & 0x3f] : '=';
-    b64out[j++] = i+2 < got ? b64[v & 0x3f] : '=';
-  }
-  b64out[j] = '\0';
-  free(buf);
-
-  // Determine MIME type from extension
-  const char* ext = strrchr(path, '.');
-  const char* mime = "application/octet-stream";
-  if (ext) {
-    if (strcasecmp(ext, ".wav") == 0) mime = "audio/wav";
-    else if (strcasecmp(ext, ".aiff") == 0 || strcasecmp(ext, ".aif") == 0) mime = "audio/aiff";
-    else if (strcasecmp(ext, ".flac") == 0) mime = "audio/flac";
-    else if (strcmp(ext, ".dna") == 0) mime = "application/octet-stream";
-  }
-
-  // Escape single quotes in path for JS string
+  // Escape single quotes and backslashes for JS string
   std::string escaped;
   for (const char* p = path; *p; ++p) {
     if (*p == '\\') escaped += "\\\\";
     else if (*p == '\'') escaped += "\\'";
+    else if (*p == '"') escaped += "\\\"";
     else escaped += *p;
   }
 
   // Determine drop type from extension
+  const char* ext = strrchr(path, '.');
   const char* dropType = "target";
   if (ext && (strcasecmp(ext, ".dna") == 0)) dropType = "source";
 
-  // Build JS to inject the file
-  std::string js = "try{"
-    "var bytes=Uint8Array.from(atob('" + std::string(b64out) + "'),function(c){return c.charCodeAt(0);});"
-    "var f=new File([new Blob([bytes])],'" + escaped + "');"
-    "window.app.handleDrop({dataTransfer:{files:[f]},preventDefault:function(){}},'" + std::string(dropType) + "');"
-    "}catch(e){}";
-  free(b64out);
+  // Just call window.app.loadFile(path, type) — C++ reads the file
+  std::string js = "try{window.app.loadFile('" + escaped + "','" + std::string(dropType) + "');}catch(e){}";
 
   webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(g_state->webview),
       js.c_str(), -1, nullptr, nullptr, nullptr, nullptr, nullptr);

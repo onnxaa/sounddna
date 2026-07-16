@@ -61,7 +61,14 @@ void TextureProcessor::Process(const float* input, float* output, int numSamples
     return;
   }
 
-  mSmoothAmount += (mTransferAmount - mSmoothAmount) * (1.0 - mRampCoef);
+  double blockRamp = std::pow(mRampCoef, numSamples);
+  mSmoothAmount = mSmoothAmount * blockRamp + mTransferAmount * (1.0 - blockRamp);
+
+  if (mSmoothAmount < 0.001) {
+    std::copy(input, input + numSamples, output);
+    return;
+  }
+
   double satDiff = (mTarget.saturationAmount - mSource.saturationAmount) * mSmoothAmount;
   double drive = 1.0 + std::max(0.0, satDiff) * 4.0;
 

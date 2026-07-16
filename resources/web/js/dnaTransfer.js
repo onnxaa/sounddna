@@ -72,7 +72,7 @@ class DNATransferUI {
     if (!this.genes[idx]) return;
     this.genes[idx].amount = parseInt(val);
     this.genes[idx].valueEl.textContent = val + '%';
-    SDNA.Bridge.sendParam(idx + 3, parseInt(val) / 100);
+    SDNA.Bridge.sendParam(SDNA.utils.geneToParam[idx], parseInt(val) / 100);
   }
 
   toggleLock(idx) {
@@ -82,7 +82,7 @@ class DNATransferUI {
     gene.lockEl.textContent = gene.locked ? '🔒' : '🔓';
     gene.lockEl.classList.toggle('locked', gene.locked);
 
-    const paramIdx = idx + 3 + 13;
+    const paramIdx = SDNA.utils.geneToParam[idx] + 14;
     SDNA.Bridge.sendParam(paramIdx, gene.locked ? 1 : 0);
 
     if (gene.locked) {

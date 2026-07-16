@@ -3,7 +3,7 @@
 #include <algorithm>
 
 GlueProcessor::GlueProcessor() { Reset(); }
-void GlueProcessor::Reset() { mEnvL = mEnvR = mRMSAvg = 0.0; mRMSWindow = 0; mSmoothAmount = mTransferAmount; }
+void GlueProcessor::Reset() { mEnvL = mEnvR = 0.0; mSmoothAmount = mTransferAmount; }
 
 void GlueProcessor::SetSampleRate(double sr) {
   mSampleRate = sr;
@@ -29,7 +29,8 @@ void GlueProcessor::Process(const float* inputL, const float* inputR,
 
   double sourceRMS = std::max(mSource.rms, 0.001);
   double targetRMS = std::max(mTarget.rms, 0.001);
-  mSmoothAmount += (mTransferAmount - mSmoothAmount) * (1.0 - mRampCoef);
+  double blockRamp = std::pow(mRampCoef, numSamples);
+  mSmoothAmount = mSmoothAmount * blockRamp + mTransferAmount * (1.0 - blockRamp);
   double rmsRatio = targetRMS / sourceRMS;
   rmsRatio = 1.0 + (rmsRatio - 1.0) * mSmoothAmount;
   double makeupGain = std::clamp(1.0 / std::sqrt(rmsRatio), 0.25, 4.0);
@@ -42,9 +43,6 @@ void GlueProcessor::Process(const float* inputL, const float* inputR,
 
   double atkCoef = std::exp(-1.0 / (0.001 * mSampleRate));
   double relCoef = std::exp(-1.0 / (0.050 * mSampleRate));
-
-  int windowSize = (int)(0.050 * mSampleRate);
-  mRMSWindow = std::max(mRMSWindow, windowSize);
 
   for (int i = 0; i < numSamples; ++i) {
     double avgL = (double)inputL[i] * (double)inputL[i];

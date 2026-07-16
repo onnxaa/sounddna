@@ -23,6 +23,7 @@ private:
   void AnalyzeSpectral(const float* audio, int numSamples,
                        SpectralFeatures& out);
   void AnalyzeHarmonics(const std::vector<double>& mag,
+                        double fundamentalBin,
                         std::vector<double>& harmonicProfile);
   void AnalyzeDynamics(const float* audio, int numSamples,
                        DynamicFeatures& out);
@@ -30,7 +31,7 @@ private:
                      int numSamples, StereoFeatures& out);
   void AnalyzeNoise(const float* audio, int numSamples,
                     NoiseFeatures& out);
-  void AnalyzeTexture(const float* audio, int numSamples,
+  void AnalyzeTexture(const float* audio, int numSamples, double rms, double pitch,
                       TextureFeatures& out);
   void AnalyzeSpace(const float* audio, int numSamples,
                     SpaceFeatures& out);

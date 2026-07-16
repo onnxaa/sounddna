@@ -99,14 +99,6 @@ void TransferEngine::UpdateProcessors() {
   mResonanceProc.SetTransferAmount(amt(DNAGene::Resonance));
 }
 
-void TransferEngine::AnalyzeInput(const float* inputL, const float* inputR,
-                                   int numSamples, bool isStereo,
-                                   DNAProfile& out) {
-  DNAAnalyzer analyzer;
-  analyzer.SetSampleRate(mSampleRate);
-  analyzer.ComputeFullAnalysis(inputL, inputR, numSamples, isStereo, out);
-}
-
 template<typename Proc>
 void TransferEngine::ApplyProcessor(Proc& proc, const DNATransferParams& params,
                                      DNAGene gene,
@@ -141,67 +133,56 @@ void TransferEngine::Process(const float* inputL, const float* inputR,
     return;
   }
 
-  int n = std::min(numSamples, kMaxBlock);
-
-  // For very small blocks, skip FFT-based processors
-  if (n < kFFTHop) {
-    std::copy(inputL, inputL + n, outputL);
-    if (isStereo)
-      std::copy(inputR, inputR + n, outputR);
-    else
-      std::copy(inputL, inputL + n, outputR);
-    return;
-  }
-
-  std::copy(inputL, inputL + n, mScratchL.begin());
-  std::copy(isStereo ? inputR : inputL,
-            isStereo ? inputR + n : inputL + n,
-            mScratchR.begin());
-
   auto& p = mParams;
+  int pos = 0;
+  while (pos < numSamples) {
+    int n = std::min(numSamples - pos, kMaxBlock);
 
-  if (!p.locks[static_cast<int>(DNAGene::Tone)] && n >= kFFTHop)
-    ApplyProcessor(mSpectralProc, p, DNAGene::Tone, mScratchL, mScratchR, n, isStereo);
+    std::copy(inputL + pos, inputL + pos + n, mScratchL.begin());
+    const float* rSrc = isStereo ? inputR : inputL;
+    std::copy(rSrc + pos, rSrc + pos + n, mScratchR.begin());
 
-  if (!p.locks[static_cast<int>(DNAGene::Dynamics)])
-    ApplyProcessor(mDynamicsProc, p, DNAGene::Dynamics, mScratchL, mScratchR, n, isStereo);
+    if (!p.locks[static_cast<int>(DNAGene::Tone)])
+      ApplyProcessor(mSpectralProc, p, DNAGene::Tone, mScratchL, mScratchR, n, isStereo);
 
-  if (!p.locks[static_cast<int>(DNAGene::Noise)])
-    ApplyProcessor(mNoiseProc, p, DNAGene::Noise, mScratchL, mScratchR, n, isStereo);
+    if (!p.locks[static_cast<int>(DNAGene::Dynamics)])
+      ApplyProcessor(mDynamicsProc, p, DNAGene::Dynamics, mScratchL, mScratchR, n, isStereo);
 
-  if (!p.locks[static_cast<int>(DNAGene::Texture)])
-    ApplyProcessor(mTextureProc, p, DNAGene::Texture, mScratchL, mScratchR, n, isStereo);
+    if (!p.locks[static_cast<int>(DNAGene::Noise)])
+      ApplyProcessor(mNoiseProc, p, DNAGene::Noise, mScratchL, mScratchR, n, isStereo);
 
-  if (!p.locks[static_cast<int>(DNAGene::Air)])
-    ApplyProcessor(mAirProc, p, DNAGene::Air, mScratchL, mScratchR, n, isStereo);
+    if (!p.locks[static_cast<int>(DNAGene::Texture)])
+      ApplyProcessor(mTextureProc, p, DNAGene::Texture, mScratchL, mScratchR, n, isStereo);
 
-  if (!p.locks[static_cast<int>(DNAGene::Resonance)])
-    ApplyProcessor(mResonanceProc, p, DNAGene::Resonance, mScratchL, mScratchR, n, isStereo);
+    if (!p.locks[static_cast<int>(DNAGene::Air)])
+      ApplyProcessor(mAirProc, p, DNAGene::Air, mScratchL, mScratchR, n, isStereo);
 
-  if (!p.locks[static_cast<int>(DNAGene::Stereo)] && isStereo)
-    mStereoProc.Process(mScratchL.data(), mScratchR.data(),
-                         mScratchL.data(), mScratchR.data(), n);
+    if (!p.locks[static_cast<int>(DNAGene::Resonance)])
+      ApplyProcessor(mResonanceProc, p, DNAGene::Resonance, mScratchL, mScratchR, n, isStereo);
 
-  if (!p.locks[static_cast<int>(DNAGene::Space)] && isStereo) {
-    mSpaceProc.Process(mScratchL.data(), mScratchR.data(),
-                        mScratchL.data(), mScratchR.data(), n);
-  }
-
-  if (!p.locks[static_cast<int>(DNAGene::Movement)] && isStereo) {
-    mMovementProc.Process(mScratchL.data(), mScratchR.data(),
+    if (!p.locks[static_cast<int>(DNAGene::Stereo)] && isStereo)
+      mStereoProc.Process(mScratchL.data(), mScratchR.data(),
                            mScratchL.data(), mScratchR.data(), n);
-  }
 
-  if (!p.locks[static_cast<int>(DNAGene::Glue)] && isStereo) {
-    mGlueProc.Process(mScratchL.data(), mScratchR.data(),
-                       mScratchL.data(), mScratchR.data(), n);
-  }
+    if (!p.locks[static_cast<int>(DNAGene::Space)] && isStereo) {
+      mSpaceProc.Process(mScratchL.data(), mScratchR.data(),
+                          mScratchL.data(), mScratchR.data(), n);
+    }
 
-  double mixWet = 0.5;
-  for (int i = 0; i < n; ++i) {
-    outputL[i] = (float)(inputL[i] * (1.0 - mixWet) + mScratchL[i] * mixWet);
-    outputR[i] = isStereo
-      ? (float)(inputR[i] * (1.0 - mixWet) + mScratchR[i] * mixWet)
-      : outputL[i];
+    if (!p.locks[static_cast<int>(DNAGene::Movement)] && isStereo) {
+      mMovementProc.Process(mScratchL.data(), mScratchR.data(),
+                             mScratchL.data(), mScratchR.data(), n);
+    }
+
+    if (!p.locks[static_cast<int>(DNAGene::Glue)] && isStereo) {
+      mGlueProc.Process(mScratchL.data(), mScratchR.data(),
+                         mScratchL.data(), mScratchR.data(), n);
+    }
+
+    for (int i = 0; i < n; ++i) {
+      outputL[pos + i] = mScratchL[i];
+      outputR[pos + i] = isStereo ? mScratchR[i] : mScratchL[i];
+    }
+    pos += n;
   }
 }

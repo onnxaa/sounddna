@@ -95,22 +95,29 @@ class DNACompareUI {
     }
 
     // Normalize values
+    const n = (v, def) => v !== undefined && v !== null ? v : def;
     const normA = [
-      this.profileA.brightness || 0.5,
-      this.profileA.dynamicRange ? Math.min(this.profileA.dynamicRange / 30, 1) : 0.5,
-      this.profileA.stereoWidth || 0.5,
-      this.profileA.noiseFloor ? Math.min(Math.abs(this.profileA.noiseFloor) / 90, 1) : 0.5,
-      this.profileA.saturation || 0.5,
-      this.profileA.centroid ? Math.min(this.profileA.centroid / 8000, 1) : 0.5,
-    ];
+      n(this.profileA.brightness, 0.5),
+      n(this.profileA.dynamicRange, 15),
+      n(this.profileA.stereoWidth, 0.5),
+      n(this.profileA.noiseFloor, -80),
+      n(this.profileA.saturation, 0.5),
+      n(this.profileA.centroid, 3000),
+    ].map((v, i) => {
+      const maxVals = [1, 30, 1, 90, 1, 8000];
+      return i === 3 ? Math.min(Math.abs(v) / maxVals[i], 1) : Math.min(v / maxVals[i], 1);
+    });
     const normB = [
-      this.profileB.brightness || 0.5,
-      this.profileB.dynamicRange ? Math.min(this.profileB.dynamicRange / 30, 1) : 0.5,
-      this.profileB.stereoWidth || 0.5,
-      this.profileB.noiseFloor ? Math.min(Math.abs(this.profileB.noiseFloor) / 90, 1) : 0.5,
-      this.profileB.saturation || 0.5,
-      this.profileB.centroid ? Math.min(this.profileB.centroid / 8000, 1) : 0.5,
-    ];
+      n(this.profileB.brightness, 0.5),
+      n(this.profileB.dynamicRange, 15),
+      n(this.profileB.stereoWidth, 0.5),
+      n(this.profileB.noiseFloor, -80),
+      n(this.profileB.saturation, 0.5),
+      n(this.profileB.centroid, 3000),
+    ].map((v, i) => {
+      const maxVals = [1, 30, 1, 90, 1, 8000];
+      return i === 3 ? Math.min(Math.abs(v) / maxVals[i], 1) : Math.min(v / maxVals[i], 1);
+    });
 
     // Draw profile A
     this.drawRadarPolygon(ctx, cx, cy, radius, numAxes, normA, 'rgba(108,92,231,0.3)', '#6c5ce7');
@@ -154,13 +161,14 @@ class DNACompareUI {
     if (!container) return;
     container.innerHTML = '';
 
+    const val = (p, key, def) => p[key] !== undefined && p[key] !== null ? p[key] : def;
     const features = [
-      { key: 'brightness', label: 'Brightness', a: this.profileA.brightness || 0, b: this.profileB.brightness || 0 },
-      { key: 'dynamicRange', label: 'Dynamic Range', a: this.profileA.dynamicRange || 0, b: this.profileB.dynamicRange || 0 },
-      { key: 'stereoWidth', label: 'Stereo Width', a: this.profileA.stereoWidth || 0, b: this.profileB.stereoWidth || 0 },
-      { key: 'noiseFloor', label: 'Noise Floor', a: this.profileA.noiseFloor || -90, b: this.profileB.noiseFloor || -90 },
-      { key: 'saturation', label: 'Saturation', a: this.profileA.saturation || 0, b: this.profileB.saturation || 0 },
-      { key: 'distortion', label: 'Distortion', a: this.profileA.distortion || 0, b: this.profileB.distortion || 0 },
+      { key: 'brightness', label: 'Brightness', a: val(this.profileA, 'brightness', 0), b: val(this.profileB, 'brightness', 0) },
+      { key: 'dynamicRange', label: 'Dynamic Range', a: val(this.profileA, 'dynamicRange', 0), b: val(this.profileB, 'dynamicRange', 0) },
+      { key: 'stereoWidth', label: 'Stereo Width', a: val(this.profileA, 'stereoWidth', 0), b: val(this.profileB, 'stereoWidth', 0) },
+      { key: 'noiseFloor', label: 'Noise Floor', a: val(this.profileA, 'noiseFloor', -90), b: val(this.profileB, 'noiseFloor', -90) },
+      { key: 'saturation', label: 'Saturation', a: val(this.profileA, 'saturation', 0), b: val(this.profileB, 'saturation', 0) },
+      { key: 'distortion', label: 'Distortion', a: val(this.profileA, 'distortion', 0), b: val(this.profileB, 'distortion', 0) },
     ];
 
     for (const feat of features) {
