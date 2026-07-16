@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SoundDNA</title>
+  <title>Geno</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -11,8 +11,9 @@
     <div class="toolbar">
       <div class="toolbar-brand">
         <div class="logo"></div>
-        SoundDNA
+        Geno
       </div>
+      <div class="toolbar-brand-sub">Audio DNA Transfer</div>
       <div class="toolbar-actions">
         <button class="toolbar-btn" onclick="window.app.undo()">Undo</button>
         <button class="toolbar-btn" onclick="window.app.redo()">Redo</button>
@@ -42,7 +43,10 @@
             <div class="analyzer-row"><span class="analyzer-label">Noise</span><span class="analyzer-value" id="targetNoise">—</span></div>
           </div>
           <div class="btn-group">
-            <button class="btn btn-primary btn-small" onclick="SAMFUI(0)">Analyze Target</button>
+            <button class="btn btn-primary btn-small" id="recordBtn" onclick="app.toggleCapture()">● Record</button>
+            <button class="btn btn-small" onclick="app.analyzeTarget()">Analyze</button>
+            <input type="file" id="audioFileInput" accept=".wav,.aiff,.aif,.flac" style="display:none" onchange="app.onAudioFileSelected(this)">
+            <button class="btn btn-small" onclick="document.getElementById('audioFileInput').click()">Load File</button>
           </div>
         </div>
       </div>
@@ -59,9 +63,10 @@
             <div class="dropzone-text">Drop DNA file or select from library</div>
           </div>
           <div class="btn-group">
-            <button class="btn btn-small" onclick="SAMFUI(1)">From Library</button>
-            <button class="btn btn-small" onclick="SAMFUI(2)">From File</button>
-            <button class="btn btn-small" onclick="SAMFUI(3)">Analyze Current</button>
+            <button class="btn btn-small" onclick="app.toggleBrowser()">From Library</button>
+            <input type="file" id="dnaFileInput" accept=".dna,.json" style="display:none" onchange="app.onDNAFileSelected(this)">
+            <button class="btn btn-small" onclick="document.getElementById('dnaFileInput').click()">From File</button>
+            <button class="btn btn-small" onclick="app.analyzeSource()">Analyze Current</button>
           </div>
           <div class="dna-layers" id="dnaLayers">
             <div class="dna-layer"><div class="dna-layer-color" style="background:var(--accent)"></div><span class="dna-layer-name">Default</span><span class="dna-layer-pct">100%</span></div>
@@ -140,12 +145,12 @@
   </div>
 
   <script src="js/utils.js"></script>
-  <script src="js/dnaMap.js"></script>
-  <script src="js/dnaAnalyzer.js"></script>
-  <script src="js/dnaTransfer.js"></script>
-  <script src="js/dnaCompare.js"></script>
-  <script src="js/dnaMorph.js"></script>
-  <script src="js/dnaBrowser.js"></script>
+  <script src="js/mapView.js"></script>
+  <script src="js/analyzerView.js"></script>
+  <script src="js/transferView.js"></script>
+  <script src="js/compareView.js"></script>
+  <script src="js/morphView.js"></script>
+  <script src="js/browserView.js"></script>
   <script src="js/app.js"></script>
 
   <script>

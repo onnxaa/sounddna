@@ -1,4 +1,4 @@
-class SoundDNAApp {
+class GenoApp {
   constructor() {
     this.params = {};
     this.currentAB = 'a';
@@ -10,7 +10,7 @@ class SoundDNAApp {
   }
 
   init() {
-    SDNA.Bridge.requestParameters();
+    GENO.Bridge.requestParameters();
 
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'z') this.undo();
@@ -18,32 +18,32 @@ class SoundDNAApp {
     });
 
     setInterval(() => {
-      if (SDNA.dnaMap) SDNA.dnaMap.render();
+      if (GENO.dnaMap) GENO.dnaMap.render();
     }, 100);
 
-    setTimeout(() => SDNA.Bridge.requestParameters(), 500);
+    setTimeout(() => GENO.Bridge.requestParameters(), 500);
   }
 
   onParamChange(paramIdx, value) {
     this.params[paramIdx] = value;
 
-    if (paramIdx >= 3 && paramIdx < 16) {
-      const geneIdx = paramIdx - 3;
-      if (SDNA.transfer) SDNA.transfer.setGeneAmount(geneIdx, value);
+    if (paramIdx >= 3 && paramIdx < 17) {
+      const geneIdx = GENO.utils.paramToGene[paramIdx - 3];
+      if (GENO.transfer) GENO.transfer.setGeneAmount(geneIdx, value);
     }
 
-    if (paramIdx >= 16 && paramIdx < 29) {
-      const lockIdx = paramIdx - 16;
-      if (SDNA.transfer) SDNA.transfer.setGeneLock(lockIdx, value > 0.5);
+    if (paramIdx >= 17 && paramIdx < 31) {
+      const geneIdx = GENO.utils.paramToGene[paramIdx - 17];
+      if (GENO.transfer) GENO.transfer.setGeneLock(geneIdx, value > 0.5);
     }
 
-    if (paramIdx === 29) {
+    if (paramIdx === 31) {
       const pct = Math.round(value * 100);
       const slider = document.getElementById('morphSlider');
       const valEl = document.getElementById('morphValue');
       if (slider) slider.value = pct;
       if (valEl) valEl.textContent = pct + '%';
-      if (SDNA.dnaMap) SDNA.dnaMap.setMorphPosition(pct);
+      if (GENO.dnaMap) GENO.dnaMap.setMorphPosition(pct);
     }
   }
 
@@ -62,18 +62,22 @@ class SoundDNAApp {
     }
 
     switch (msgTag) {
-      case 0: {
-        if (SDNA.analyzer) SDNA.analyzer.updateReport(json);
+      case 14: {
+        if (GENO.analyzer) GENO.analyzer.updateReport(json);
         break;
       }
-      case 1: {
-        if (SDNA.analyzer) SDNA.analyzer.updateReport(json);
+      case 15: {
+        if (GENO.analyzer) GENO.analyzer.updateReport(json);
         break;
       }
-      case 12: {
+      case 13: {
         if (json && json.params) {
           this.params = json.params;
         }
+        break;
+      }
+      case 19: {
+        if (json) this.onCaptureStatus(json.capturing);
         break;
       }
       default:
@@ -81,42 +85,45 @@ class SoundDNAApp {
     }
   }
 
+  onCaptureStatus(capturing) {
+    const btn = document.getElementById('recordBtn');
+    if (btn) {
+      btn.classList.toggle('recording', capturing);
+      btn.textContent = capturing ? '■ Stop' : '● Record';
+    }
+  }
+
+  toggleCapture() {
+    GENO.Bridge.sendMessage(18, '');
+  }
+
   handleDrop(event, type) {
     event.preventDefault();
     const file = event.dataTransfer.files[0];
     if (!file) return;
 
-    if (type === 'target') {
-      this.loadAudioFile(file);
-    } else if (type === 'source') {
-      this.loadDNAFile(file);
+    // WebKit exposes the full filesystem path on dropped files
+    if (file.path) {
+      this.loadFile(file.path, type);
+    } else if (file.name) {
+      this.loadFile(file.name, type);
     }
   }
 
-  loadAudioFile(file) {
-    const validTypes = ['audio/wav', 'audio/aiff', 'audio/flac', 'audio/x-wav', 'audio/x-aiff'];
-    if (!validTypes.includes(file.type) && !file.name.match(/\.(wav|aiff?|flac)$/i)) {
-      return;
-    }
+  loadFile(path, type) {
+    const tag = type === 'source' ? 17 : 16;
+    GENO.Bridge.sendMessage(tag, path);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    if (type === 'target') {
       const dropzone = document.getElementById('targetDropzone');
       if (dropzone) {
         dropzone.classList.add('has-data');
-        dropzone.querySelector('.dropzone-text').textContent = file.name;
+        dropzone.querySelector('.dropzone-text').textContent = path.split(/[/\\]/).pop();
       }
-    };
-    reader.readAsArrayBuffer(file);
-  }
-
-  loadDNAFile(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    } else if (type === 'source') {
       const badge = document.getElementById('sourceBadge');
-      if (badge) badge.textContent = file.name;
-    };
-    reader.readAsText(file);
+      if (badge) badge.textContent = path.split(/[/\\]/).pop();
+    }
   }
 
   setAB(mode) {
@@ -128,19 +135,19 @@ class SoundDNAApp {
 
   onMixChange(value) {
     document.getElementById('mixValue').textContent = value + '%';
-    SDNA.Bridge.sendParam(2, value / 100);
+    GENO.Bridge.sendParam(2, value / 100);
   }
 
   onGainChange(value) {
     const db = ((value - 50) / 50) * 18;
     document.getElementById('gainValue').textContent = (db > 0 ? '+' : '') + db.toFixed(1) + ' dB';
-    SDNA.Bridge.sendParam(1, value / 100);
+    GENO.Bridge.sendParam(1, value / 100);
   }
 
   onMorphChange(value) {
     document.getElementById('morphValue').textContent = value + '%';
-    SDNA.Bridge.sendParam(29, value / 100);
-    if (SDNA.dnaMap) SDNA.dnaMap.setMorphPosition(parseFloat(value));
+    GENO.Bridge.sendParam(31, value / 100);
+    if (GENO.dnaMap) GENO.dnaMap.setMorphPosition(parseFloat(value));
   }
 
   undo() {
@@ -184,24 +191,42 @@ class SoundDNAApp {
       centroid: 5000,
       distortion: 0.4
     };
-    if (SDNA.compare) SDNA.compare.show(a, b);
+    if (GENO.compare) GENO.compare.show(a, b);
   }
 
   closeCompare() {
-    if (SDNA.compare) SDNA.compare.close();
+    if (GENO.compare) GENO.compare.close();
   }
 
   toggleBrowser() {
-    if (SDNA.browser) SDNA.browser.toggle();
+    if (GENO.browser) GENO.browser.toggle();
   }
 
   analyzeSource() {
-    SDNA.Bridge.analyzeSource();
+    GENO.Bridge.analyzeSource();
   }
 
   analyzeTarget() {
-    SDNA.Bridge.analyzeTarget();
+    GENO.Bridge.analyzeTarget();
+  }
+
+  onAudioFileSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.path) {
+      this.loadFile(file.path, 'target');
+    }
+    input.value = '';
+  }
+
+  onDNAFileSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.path) {
+      this.loadFile(file.path, 'source');
+    }
+    input.value = '';
   }
 }
 
-window.app = new SoundDNAApp();
+window.app = new GenoApp();

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(SoundDNA VERSION 1.0.0)
+project(Geno VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -234,34 +234,34 @@ pkg_check_modules(FFTW3 REQUIRED fftw3)
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 
 set(SOURCES
-  src/SDNA_Plugin.cpp
-  src/DSP/SDNA_Types.cpp
-  src/DSP/SDNA_FFT.cpp
-  src/DSP/SDNA_Analyzer.cpp
-  src/DSP/SDNA_SpectralProcessor.cpp
-  src/DSP/SDNA_DynamicsProcessor.cpp
-  src/DSP/SDNA_StereoProcessor.cpp
-  src/DSP/SDNA_NoiseProcessor.cpp
-  src/DSP/SDNA_TextureProcessor.cpp
-  src/DSP/SDNA_AirProcessor.cpp
-  src/DSP/SDNA_MovementProcessor.cpp
-  src/DSP/SDNA_SpaceProcessor.cpp
-  src/DSP/SDNA_GlueProcessor.cpp
-  src/DSP/SDNA_ResonanceProcessor.cpp
-  src/DSP/SDNA_TransferEngine.cpp
-  src/DSP/SDNA_MorphEngine.cpp
+  src/Geno_Plugin.cpp
+  src/DSP/Geno_Types.cpp
+  src/DSP/Geno_FFT.cpp
+  src/DSP/Geno_Analyzer.cpp
+  src/DSP/Geno_SpectralProcessor.cpp
+  src/DSP/Geno_DynamicsProcessor.cpp
+  src/DSP/Geno_StereoProcessor.cpp
+  src/DSP/Geno_NoiseProcessor.cpp
+  src/DSP/Geno_TextureProcessor.cpp
+  src/DSP/Geno_AirProcessor.cpp
+  src/DSP/Geno_MovementProcessor.cpp
+  src/DSP/Geno_SpaceProcessor.cpp
+  src/DSP/Geno_GlueProcessor.cpp
+  src/DSP/Geno_ResonanceProcessor.cpp
+  src/DSP/Geno_TransferEngine.cpp
+  src/DSP/Geno_MorphEngine.cpp
 )
 
 set(WEB_RESOURCES
   resources/web/index.html
   resources/web/css/style.css
   resources/web/js/app.js
-  resources/web/js/dnaMap.js
-  resources/web/js/dnaAnalyzer.js
-  resources/web/js/dnaTransfer.js
-  resources/web/js/dnaCompare.js
-  resources/web/js/dnaMorph.js
-  resources/web/js/dnaBrowser.js
+  resources/web/js/mapView.js
+  resources/web/js/analyzerView.js
+  resources/web/js/transferView.js
+  resources/web/js/compareView.js
+  resources/web/js/morphView.js
+  resources/web/js/browserView.js
   resources/web/js/utils.js
 )
 
@@ -281,8 +281,8 @@ file(READ "${WEB_DIR}/css/style.css" CSS_CONTENT)
 string(REPLACE "<link rel=\"stylesheet\" href=\"css/style.css\">"
   "<style>\n${CSS_CONTENT}\n</style>" HTML_CONTENT "${HTML_CONTENT}")
 
-foreach(JS_FILE js/utils.js js/dnaMap.js js/dnaAnalyzer.js js/dnaTransfer.js
-               js/dnaCompare.js js/dnaMorph.js js/dnaBrowser.js js/app.js)
+foreach(JS_FILE js/utils.js js/mapView.js js/analyzerView.js js/transferView.js
+               js/compareView.js js/morphView.js js/browserView.js js/app.js)
   file(READ "${WEB_DIR}/${JS_FILE}" JS_CONTENT)
   string(REPLACE "<script src=\"${JS_FILE}\"></script>"
     "<script>\n${JS_CONTENT}\n</script>" HTML_CONTENT "${HTML_CONTENT}")
@@ -292,7 +292,7 @@ file(WRITE "${UI_RESOURCE_SRC}"
   "// Auto-generated UI resource file. Do not edit.\n"
   "#include \"IPlugPlatform.h\"\n\n"
   "BEGIN_IPLUG_NAMESPACE\n\n"
-  "const char* kSoundDNAUIHTML = R\"NRUI_END(\n"
+  "const char* kGenoUIHTML = R\"NRUI_END(\n"
   "${HTML_CONTENT}\n"
   ")NRUI_END\";\n\n"
   "END_IPLUG_NAMESPACE\n")
@@ -302,8 +302,8 @@ list(APPEND SOURCES ${UI_RESOURCE_SRC})
 # Re-run generation when any web file changes
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
   ${WEB_DIR}/index.html ${WEB_DIR}/css/style.css ${WEB_DIR}/js/utils.js
-  ${WEB_DIR}/js/dnaMap.js ${WEB_DIR}/js/dnaAnalyzer.js ${WEB_DIR}/js/dnaTransfer.js
-  ${WEB_DIR}/js/dnaCompare.js ${WEB_DIR}/js/dnaMorph.js ${WEB_DIR}/js/dnaBrowser.js
+  ${WEB_DIR}/js/mapView.js ${WEB_DIR}/js/analyzerView.js ${WEB_DIR}/js/transferView.js
+  ${WEB_DIR}/js/compareView.js ${WEB_DIR}/js/morphView.js ${WEB_DIR}/js/browserView.js
   ${WEB_DIR}/js/app.js)
 
 iplug_add_plugin(${PROJECT_NAME}
@@ -319,8 +319,12 @@ set_source_files_properties(${UI_RESOURCE_SRC} PROPERTIES GENERATED TRUE)
 
 target_include_directories(_${PROJECT_NAME}-base INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}  # for config.h
   ${FFTW3_INCLUDE_DIRS}
   ${SNDFILE_INCLUDE_DIRS}
+)
+target_compile_options(_${PROJECT_NAME}-base INTERFACE
+  -include "${CMAKE_CURRENT_SOURCE_DIR}/config.h"
 )
 
 # ── WebView helper binary ────────────────────────────────────────────

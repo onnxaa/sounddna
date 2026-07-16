@@ -140,73 +140,26 @@ static gboolean x11_close_poll(gpointer data) {
 }
 
 /* ---- GTK-level file drop handling ---- */
-// Reads a file, base64-encodes it, and injects into page JS so app.loadAudioFile / loadDNAFile work.
-// Also saves to temp file and notifies parent for audio analysis.
+// Passes file path to JS which sends it to the plugin for analysis via SAMFUI.
 static void handle_file_drop(const char* path, int x, int y) {
   if (!g_state || !g_state->webview) return;
-  FILE* f = fopen(path, "rb");
-  if (!f) { fprintf(stderr, "[WvH] drop: cannot open %s\n", path); return; }
-  fseek(f, 0, SEEK_END);
-  long sz = ftell(f);
-  rewind(f);
-  if (sz < 0 || sz > 64LL * 1024 * 1024) { fclose(f); return; }
-  auto* buf = (unsigned char*)malloc(sz);
-  if (!buf) { fclose(f); return; }
-  size_t got = fread(buf, 1, sz, f);
-  fclose(f);
-  if (got == 0) { free(buf); return; }
 
-  // Determine extension and drop type
-  const char* ext = strrchr(path, '.');
-  const char* dropType = "target";
-  if (ext && (strcasecmp(ext, ".dna") == 0)) dropType = "source";
-  bool isAudio = (ext && (strcasecmp(ext, ".wav") == 0 || strcasecmp(ext, ".aiff") == 0 ||
-                          strcasecmp(ext, ".aif") == 0 || strcasecmp(ext, ".flac") == 0));
-
-  // For audio files: save to temp and notify parent for analysis
-  if (isAudio && got > 44) { // at least WAV header
-    char tmppath[256];
-    snprintf(tmppath, sizeof(tmppath), "/tmp/sounddna_drop_%d.wav", getpid());
-    FILE* tmpf = fopen(tmppath, "wb");
-    if (tmpf) {
-      fwrite(buf, 1, got, tmpf);
-      fclose(tmpf);
-      dprintf(STDOUT_FILENO, "AUDIO_DROP %s\n", tmppath);
-    }
-  }
-
-  // Base64 encode
-  static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  size_t b64len = 4 * ((got + 2) / 3);
-  auto* b64out = (char*)malloc(b64len + 1);
-  if (!b64out) { free(buf); return; }
-  size_t j = 0;
-  for (size_t i = 0; i < got; i += 3) {
-    unsigned a = buf[i], b = i+1 < got ? buf[i+1] : 0, c = i+2 < got ? buf[i+2] : 0;
-    unsigned v = (a << 16) | (b << 8) | c;
-    b64out[j++] = b64[(v >> 18) & 0x3f];
-    b64out[j++] = b64[(v >> 12) & 0x3f];
-    b64out[j++] = i+1 < got ? b64[(v >> 6) & 0x3f] : '=';
-    b64out[j++] = i+2 < got ? b64[v & 0x3f] : '=';
-  }
-  b64out[j] = '\0';
-  free(buf);
-
-  // Escape single quotes in path for JS string
+  // Escape single quotes and backslashes for JS string
   std::string escaped;
   for (const char* p = path; *p; ++p) {
     if (*p == '\\') escaped += "\\\\";
     else if (*p == '\'') escaped += "\\'";
+    else if (*p == '"') escaped += "\\\"";
     else escaped += *p;
   }
 
-  // Build JS to create File and call handleDrop on page
-  std::string js = "try{"
-    "var bytes=Uint8Array.from(atob('" + std::string(b64out) + "'),function(c){return c.charCodeAt(0);});"
-    "var f=new File([new Blob([bytes])],'" + escaped + "');"
-    "window.app.handleDrop({dataTransfer:{files:[f]},preventDefault:function(){}},'" + std::string(dropType) + "');"
-    "}catch(e){}";
-  free(b64out);
+  // Determine drop type from extension
+  const char* ext = strrchr(path, '.');
+  const char* dropType = "target";
+  if (ext && (strcasecmp(ext, ".dna") == 0)) dropType = "source";
+
+  // Call app.loadFile(path, type) — JS sends path to plugin via SAMFUI, plugin reads with libsndfile
+  std::string js = "try{window.app.loadFile('" + escaped + "','" + std::string(dropType) + "');}catch(e){}";
 
   webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(g_state->webview),
       js.c_str(), -1, nullptr, nullptr, nullptr, nullptr, nullptr);

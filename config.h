@@ -1,22 +1,22 @@
-#define PLUG_NAME "SoundDNA"
-#define PLUG_MFR "SoundDNA"
+#define PLUG_NAME "Geno"
+#define PLUG_MFR "Geno"
 #define PLUG_VERSION_HEX 0x00010000
 #define PLUG_VERSION_STR "1.0.0"
-#define PLUG_UNIQUE_ID 'sdna'
-#define PLUG_MFR_ID 'Sdna'
-#define PLUG_URL_STR "https://sounddna.dev"
-#define PLUG_EMAIL_STR "dev@sounddna.dev"
-#define PLUG_COPYRIGHT_STR "Copyright 2025 SoundDNA"
-#define PLUG_CLASS_NAME SoundDNA
+#define PLUG_UNIQUE_ID 'geno'
+#define PLUG_MFR_ID 'Geno'
+#define PLUG_URL_STR "https://geno.dev"
+#define PLUG_EMAIL_STR "dev@geno.dev"
+#define PLUG_COPYRIGHT_STR "Copyright 2025 Geno Audio"
+#define PLUG_CLASS_NAME Geno
 
-#define BUNDLE_NAME "SoundDNA"
-#define BUNDLE_MFR "SoundDNA"
+#define BUNDLE_NAME "Geno"
+#define BUNDLE_MFR "Geno"
 #define BUNDLE_DOMAIN "dev"
 
 #define BUNDLE_ID BUNDLE_DOMAIN "." BUNDLE_MFR "." BUNDLE_NAME API_EXT2
 #define APP_GROUP_ID "group." BUNDLE_DOMAIN "." BUNDLE_MFR "." BUNDLE_NAME
 
-#define SHARED_RESOURCES_SUBPATH "SoundDNA"
+#define SHARED_RESOURCES_SUBPATH "Geno"
 
 #define PLUG_CHANNEL_IO "2-2"
 
@@ -33,16 +33,16 @@
 #define PLUG_SHARED_RESOURCES 0
 #define PLUG_HOST_RESIZE 1
 
-#define AUV2_ENTRY SoundDNA_Entry
-#define AUV2_ENTRY_STR "SoundDNA_Entry"
-#define AUV2_FACTORY SoundDNA_Factory
-#define AUV2_VIEW_CLASS SoundDNA_View
-#define AUV2_VIEW_CLASS_STR "SoundDNA_View"
+#define AUV2_ENTRY Geno_Entry
+#define AUV2_ENTRY_STR "Geno_Entry"
+#define AUV2_FACTORY Geno_Factory
+#define AUV2_VIEW_CLASS Geno_View
+#define AUV2_VIEW_CLASS_STR "Geno_View"
 
-#define AAX_TYPE_IDS 'SDNA'
-#define AAX_TYPE_IDS_AUDIOSUITE 'SDNA'
-#define AAX_PLUG_MFR_STR "SoundDNA"
-#define AAX_PLUG_NAME_STR "SoundDNA\nSdna"
+#define AAX_TYPE_IDS 'Geno'
+#define AAX_TYPE_IDS_AUDIOSUITE 'Geno'
+#define AAX_PLUG_MFR_STR "Geno"
+#define AAX_PLUG_NAME_STR "Geno\nGeno"
 #define AAX_PLUG_CATEGORY_STR "Effect"
 #define AAX_DOES_AUDIOSUITE 1
 

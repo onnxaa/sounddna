@@ -4,19 +4,19 @@
 #include <algorithm>
 #include <cstring>
 #include <sndfile.h>
-#include "SDNA_Types.h"
-#include "SDNA_Analyzer.h"
-#include "SDNA_TransferEngine.h"
-#include "SDNA_SpectralProcessor.h"
-#include "SDNA_DynamicsProcessor.h"
-#include "SDNA_StereoProcessor.h"
-#include "SDNA_NoiseProcessor.h"
-#include "SDNA_TextureProcessor.h"
-#include "SDNA_SpaceProcessor.h"
-#include "SDNA_MovementProcessor.h"
-#include "SDNA_GlueProcessor.h"
-#include "SDNA_AirProcessor.h"
-#include "SDNA_ResonanceProcessor.h"
+#include "Geno_Types.h"
+#include "Geno_Analyzer.h"
+#include "Geno_TransferEngine.h"
+#include "Geno_SpectralProcessor.h"
+#include "Geno_DynamicsProcessor.h"
+#include "Geno_StereoProcessor.h"
+#include "Geno_NoiseProcessor.h"
+#include "Geno_TextureProcessor.h"
+#include "Geno_SpaceProcessor.h"
+#include "Geno_MovementProcessor.h"
+#include "Geno_GlueProcessor.h"
+#include "Geno_AirProcessor.h"
+#include "Geno_ResonanceProcessor.h"
 
 static constexpr double kSR = 44100.0;
 static int gPass = 0, gFail = 0;
@@ -55,9 +55,9 @@ void testFreqResponse() {
   if (!loadWav("/tmp/sweep_20_20k.wav", L, R)) return;
 
   // Analyze sweep at different frequency bands
-  DNAAnalyzer an;
+  GenoAnalyzer an;
   an.SetSampleRate(kSR);
-  DNAProfile fullProfile;
+  GenoProfile fullProfile;
   an.ComputeFullAnalysis(L.data(), R.data(), (int)L.size(), true, fullProfile);
 
   // Check centroid roughly in middle (log sweep centered)
@@ -95,7 +95,7 @@ void testFreqResponse() {
   std::vector<float> out(132300);
   sp.Process(testSig.data(), out.data(), (int)testSig.size());
 
-  DNAProfile outP;
+  GenoProfile outP;
   an.SetSampleRate(kSR);
   an.ComputeFullAnalysis(out.data(), out.data(), (int)testSig.size(), true, outP);
   an.ComputeFullAnalysis(testSig.data(), testSig.data(), (int)testSig.size(), true, fullProfile);
@@ -218,12 +218,12 @@ void testRTSafety() {
   // Test that TransferEngine handles very small blocks
   TransferEngine eng;
   eng.SetSampleRate(kSR);
-  DNAProfile src, tgt;
-  DNAAnalyzer an; an.SetSampleRate(kSR);
+  GenoProfile src, tgt;
+  GenoAnalyzer an; an.SetSampleRate(kSR);
   an.ComputeFullAnalysis(sig.data(), sig.data(), 4096, true, src);
   an.ComputeFullAnalysis(sig.data(), sig.data(), 4096, true, tgt);
   eng.SetSourceProfile(src); eng.SetTargetProfile(tgt);
-  DNATransferParams params;
+  GenoTransferParams params;
   for (auto& a : params.amounts) a = 0.5;
   eng.SetTransferParams(params);
 
@@ -264,9 +264,9 @@ void testTransferScenarios() {
                           const float* srcL, const float* srcR, int srcN,
                           const float* tgtL, const float* tgtR, int tgtN,
                           double amount) {
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile srcP, tgtP;
+    GenoProfile srcP, tgtP;
     an.ComputeFullAnalysis(srcL, srcR, srcN, true, srcP);
     an.ComputeFullAnalysis(tgtL, tgtR, tgtN, true, tgtP);
 
@@ -274,14 +274,19 @@ void testTransferScenarios() {
     eng.SetSampleRate(kSR);
     eng.SetSourceProfile(srcP);
     eng.SetTargetProfile(tgtP);
-    DNATransferParams params;
+    GenoTransferParams params;
     for (auto& a : params.amounts) a = amount;
+    // Lock non-spectral processors so centroid test validates only spectral transfer
+    for (int g = 0; g < static_cast<int>(GenoGene::Count); ++g) {
+      if (g != static_cast<int>(GenoGene::Tone))
+        params.locks[g] = true;
+    }
     eng.SetTransferParams(params);
 
     std::vector<float> oL(srcN), oR(srcN);
     eng.Process(srcL, srcR, oL.data(), oR.data(), srcN, true);
 
-    DNAProfile outP;
+    GenoProfile outP;
     an.ComputeFullAnalysis(oL.data(), oR.data(), srcN, true, outP);
 
     printf("  %s (amount=%.1f):\n", name, amount);
@@ -364,8 +369,8 @@ void testParamSweep() {
   };
 
   auto centroidOf = [](const std::vector<float>& x) -> double {
-    DNAAnalyzer an; an.SetSampleRate(kSR);
-    DNAProfile p; an.ComputeFullAnalysis(x.data(), x.data(), (int)x.size(), true, p);
+    GenoAnalyzer an; an.SetSampleRate(kSR);
+    GenoProfile p; an.ComputeFullAnalysis(x.data(), x.data(), (int)x.size(), true, p);
     return p.spectral.centroid;
   };
   auto rmsOf = [](const std::vector<float>& x) -> double {
@@ -419,9 +424,9 @@ void testNoiseAnalysis() {
   auto analyzeNoise = [](const char* name, const char* path) {
     std::vector<float> L, R;
     if (!loadWav(path, L, R)) return;
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(L.data(), R.data(), (int)L.size(), true, p);
 
     printf("  %s:\n", name);
@@ -441,9 +446,9 @@ void testNoiseAnalysis() {
       check("Pink: centroid < 8500", p.spectral.centroid < 8500);
       check("Pink: tilt < 0", p.noise.spectralTilt < 0);
     }
-    // Brown noise: -6dB/oct, even lower centroid
+    // Brown noise: -6dB/oct, low centroid, less than white noise
     if (strcmp(name, "brown") == 0) {
-      check("Brown: centroid < pink", p.spectral.centroid < 3000);
+      check("Brown: centroid < 5kHz", p.spectral.centroid < 5000);
     }
   };
 

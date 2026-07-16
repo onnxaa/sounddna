@@ -2,19 +2,19 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
-#include "SDNA_Types.h"
-#include "SDNA_Analyzer.h"
-#include "SDNA_TransferEngine.h"
-#include "SDNA_TextureProcessor.h"
-#include "SDNA_SpectralProcessor.h"
-#include "SDNA_DynamicsProcessor.h"
-#include "SDNA_StereoProcessor.h"
-#include "SDNA_NoiseProcessor.h"
-#include "SDNA_SpaceProcessor.h"
-#include "SDNA_MovementProcessor.h"
-#include "SDNA_GlueProcessor.h"
-#include "SDNA_AirProcessor.h"
-#include "SDNA_ResonanceProcessor.h"
+#include "Geno_Types.h"
+#include "Geno_Analyzer.h"
+#include "Geno_TransferEngine.h"
+#include "Geno_TextureProcessor.h"
+#include "Geno_SpectralProcessor.h"
+#include "Geno_DynamicsProcessor.h"
+#include "Geno_StereoProcessor.h"
+#include "Geno_NoiseProcessor.h"
+#include "Geno_SpaceProcessor.h"
+#include "Geno_MovementProcessor.h"
+#include "Geno_GlueProcessor.h"
+#include "Geno_AirProcessor.h"
+#include "Geno_ResonanceProcessor.h"
 
 static constexpr double kSR = 44100.0;
 static constexpr int kLen = 44100;
@@ -43,9 +43,9 @@ int main() {
   // 1. Silence
   {
     std::vector<float> sig(kLen, 0.f);
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(sig.data(), sig.data(), kLen, true, p);
     check("Silence: rms≈0", p.dynamics.rms < 1e-6);
     check("Silence: peak≈0", p.dynamics.peak < 1e-6);
@@ -74,9 +74,9 @@ int main() {
   // 3. DC offset
   {
     std::vector<float> sig(kLen, 0.1f);
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(sig.data(), sig.data(), kLen, true, p);
     check("DC: pitch=0", p.spectral.pitch == 0.0, std::to_string(p.spectral.pitch).c_str());
     check("DC: crestFactor≈1", std::abs(p.dynamics.crestFactor - 1.0) < 0.1);
@@ -88,9 +88,9 @@ int main() {
     double amp = 0.001;
     for (int i = 0; i < kLen; i++)
       sig[i] = (float)(amp * std::sin(2.0 * M_PI * 440.0 * i / kSR));
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(sig.data(), sig.data(), kLen, true, p);
     check("Quiet: pitch≈440", std::abs(p.spectral.pitch - 440.0) < 20.0);
     check("Quiet: rms≈0.0007", p.dynamics.rms > 1e-6 && p.dynamics.rms < 0.01);
@@ -103,9 +103,9 @@ int main() {
       L[i] = 0.5f * std::sin(2.0 * M_PI * 440.0 * i / kSR);
       R[i] = 0.5f * std::sin(2.0 * M_PI * 440.0 * i / kSR + 0.5);
     }
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(L.data(), R.data(), kLen, true, p);
     check("Stereo: width>0", p.stereo.width > 0.05);
     check("Stereo: correlation<1", p.stereo.phaseCorrelation < 0.99);
@@ -118,7 +118,7 @@ int main() {
     sp.SetTransferAmount(1.0);
     std::vector<float> oL(kLen), oR(kLen);
     sp.Process(L.data(), R.data(), oL.data(), oR.data(), kLen);
-    DNAProfile outP;
+    GenoProfile outP;
     an.ComputeFullAnalysis(oL.data(), oR.data(), kLen, true, outP);
     check("Stereo proc: width reduced", outP.stereo.width < p.stereo.width * 0.9);
     check("Stereo proc: output valid", outP.stereo.phaseCorrelation >= -1.0 && outP.stereo.phaseCorrelation <= 1.0);
@@ -128,9 +128,9 @@ int main() {
   {
     std::vector<float> sig(kLen, 0.f);
     sig[0] = 1.0f;
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(sig.data(), sig.data(), kLen, true, p);
     check("Impulse: crest>10", p.dynamics.crestFactor > 5.0);
     check("Impulse: flatness high", p.spectral.spectralFlatness > 0.5);
@@ -221,15 +221,15 @@ int main() {
       src[i] = (float)(0.5 * std::sin(2.0 * M_PI * 220.0 * i / kSR));
       tgt[i] = (float)(0.3 * std::sin(2.0 * M_PI * 880.0 * i / kSR) * std::exp(-i * 0.001));
     }
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile sP, tP;
+    GenoProfile sP, tP;
     an.ComputeFullAnalysis(src.data(), src.data(), kLen, true, sP);
     an.ComputeFullAnalysis(tgt.data(), tgt.data(), kLen, true, tP);
     TransferEngine eng;
     eng.SetSampleRate(kSR);
     eng.SetSourceProfile(sP); eng.SetTargetProfile(tP);
-    DNATransferParams params;
+    GenoTransferParams params;
     for (auto& a : params.amounts) a = 0.0;
     eng.SetTransferParams(params);
     std::vector<float> oL(kLen), oR(kLen);
@@ -250,9 +250,9 @@ int main() {
   {
     std::vector<float> sig(64, 0.f);
     sig[0] = 1.0f;
-    DNAAnalyzer an;
+    GenoAnalyzer an;
     an.SetSampleRate(kSR);
-    DNAProfile p;
+    GenoProfile p;
     an.ComputeFullAnalysis(sig.data(), sig.data(), 64, true, p);
     check("Short block: no crash", true);
     check("Short block: defaults", p.dynamics.rms > 0 || p.spectral.pitch >= 0);
@@ -260,7 +260,7 @@ int main() {
 
   // 13. All profiles Interpolate
   {
-    DNAProfile a, b;
+    GenoProfile a, b;
     a.spectral.spectralEnvelope.assign(kNumSpectralBands, 0.5);
     b.spectral.spectralEnvelope.assign(kNumSpectralBands, 0.8);
     a.spectral.harmonicProfile.assign(kNumHarmonics, 0.1);
@@ -282,7 +282,7 @@ int main() {
 
   // 14. Similarity symmetric
   {
-    DNAProfile a, b;
+    GenoProfile a, b;
     a.spectral.spectralEnvelope.assign(kNumSpectralBands, 0.5);
     b.spectral.spectralEnvelope.assign(kNumSpectralBands, 0.5);
     a.spectral.harmonicProfile.assign(kNumHarmonics, 0.1);
@@ -297,7 +297,7 @@ int main() {
 
   // 15. ToFeatureVector round-trip
   {
-    DNAProfile a;
+    GenoProfile a;
     a.spectral.spectralEnvelope.resize(kNumSpectralBands);
     a.spectral.harmonicProfile.resize(kNumHarmonics);
     for (int i = 0; i < kNumSpectralBands; ++i)
@@ -309,7 +309,7 @@ int main() {
     a.stereo.width = 0.7; a.noise.noiseFloorDb = -60;
     a.texture.saturationAmount = 0.3;
     auto vec = a.ToFeatureVector();
-    auto b = DNAProfile::FromFeatureVector(vec);
+    auto b = GenoProfile::FromFeatureVector(vec);
     check("FeatureVector round-trip: centroid",
           std::abs(b.spectral.centroid - a.spectral.centroid) < 0.01);
     check("FeatureVector round-trip: brightness",

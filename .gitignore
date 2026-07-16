@@ -5,3 +5,8 @@ tmp/
 out/
 __pycache__/
 *.pyc
+test/test_debug
+test/test_deep
+test/test_dsp
+test/test_edge
+test/test_plugin
